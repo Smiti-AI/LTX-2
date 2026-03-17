@@ -70,13 +70,21 @@ run_scene() {
   local image_args_str
 
   global_prompt=$(jq -r '.global_prompt // ""' "$config" 2>/dev/null || echo "")
-  specific_prompts=$(jq -r '.specific_prompts // []' "$config" 2>/dev/null || echo "[]")
-  prompt=$(jq -r --argjson idx "$PROMPT_INDEX" '.specific_prompts[$idx] // .specific_prompts[0] // .global_prompt // "High-quality 3D animation"' "$config" 2>/dev/null || echo "High-quality 3D animation")
-  if [ -z "$prompt" ] || [ "$prompt" = "null" ]; then
-    prompt="$global_prompt"
+  specific_prompt=$(jq -r --argjson idx "$PROMPT_INDEX" '.specific_prompts[$idx] // .specific_prompts[0] // ""' "$config" 2>/dev/null || echo "")
+  if [ -z "$specific_prompt" ] || [ "$specific_prompt" = "null" ]; then
+    specific_prompt=""
   fi
-  if [ -z "$prompt" ] || [ "$prompt" = "null" ]; then
-    prompt="High-quality 3D animation"
+  # Always prepend global_prompt before specific_prompt
+  if [ -n "$global_prompt" ] && [ "$global_prompt" != "null" ]; then
+    if [ -n "$specific_prompt" ]; then
+      prompt="${global_prompt}
+
+${specific_prompt}"
+    else
+      prompt="$global_prompt"
+    fi
+  else
+    prompt="${specific_prompt:-High-quality 3D animation}"
   fi
 
   negative_prompt=$(jq -r '.negative_prompt // "blurry, low quality, distorted"' "$config" 2>/dev/null || echo "blurry, low quality, distorted")
