@@ -1,0 +1,3 @@
+[RUN] chase_dizzy_skye_laughing (seed=42) -> /home/smiti-user/LTX-2/output/benchmark/chase_dizzy_skye_laughing_p0.mp4
+<frozen runpy>:128: RuntimeWarning: 'ltx_pipelines.ti2vid_one_stage' found in sys.modules after import of package 'ltx_pipelines', but prior to execution of 'ltx_pipelines.ti2vid_one_stage'; this may result in unpredictable behaviour
+Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.

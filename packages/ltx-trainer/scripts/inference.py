@@ -36,7 +36,7 @@ from peft import LoraConfig, get_peft_model, set_peft_model_state_dict
 from safetensors.torch import load_file
 from torchvision import transforms
 
-from ltx_trainer.model_loader import load_model
+from ltx_trainer.model_loader import load_embeddings_processor, load_model
 from ltx_trainer.progress import StandaloneSamplingProgress
 from ltx_trainer.utils import open_image_as_srgb
 from ltx_trainer.validation_sampler import GenerationConfig, ValidationSampler
@@ -229,6 +229,11 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         default=42,
         help="Random seed for reproducibility",
     )
+    parser.add_argument(
+        "--enhance-prompt",
+        action="store_true",
+        help="Use Gemma to enhance the prompt before generation (improves detail and motion specificity)",
+    )
 
     # Conditioning arguments
     parser.add_argument(
@@ -362,13 +367,26 @@ def main() -> None:  # noqa: PLR0912, PLR0915
     if generate_audio:
         video_duration = args.num_frames / args.frame_rate
         print(f"Audio: Enabled (duration will match video: {video_duration:.2f}s)")
+    if args.enhance_prompt:
+        print("Prompt enhancement: enabled")
     print("=" * 80)
+
+    # Enhance prompt if requested (uses Gemma to expand/improve the prompt)
+    prompt = args.prompt
+    if args.enhance_prompt:
+        print("\nEnhancing prompt with Gemma...")
+        text_encoder = components.text_encoder
+        text_encoder.to(args.device)
+        prompt = text_encoder.enhance_t2v(prompt, seed=args.seed)
+        text_encoder.to("cpu")
+        preview = prompt[:300] + ("..." if len(prompt) > 300 else "")
+        print(f"Enhanced prompt: {preview}")
 
     print(f"\nGenerating {'video + audio' if generate_audio else 'video'}...")
 
     # Create generation config
     gen_config = GenerationConfig(
-        prompt=args.prompt,
+        prompt=prompt,
         negative_prompt=args.negative_prompt,
         height=args.height,
         width=args.width,
@@ -386,6 +404,13 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         stg_mode=args.stg_mode,
     )
 
+    # Load embeddings processor (required for on-the-fly prompt encoding)
+    embeddings_processor = load_embeddings_processor(
+        checkpoint_path=args.checkpoint,
+        device="cpu",
+        dtype=torch.bfloat16,
+    )
+
     # Generate with progress bar
     with StandaloneSamplingProgress(num_steps=args.num_inference_steps) as progress:
         # Create sampler with progress context
@@ -394,6 +419,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915
             vae_decoder=components.video_vae_decoder,
             vae_encoder=components.video_vae_encoder,
             text_encoder=components.text_encoder,
+            embeddings_processor=embeddings_processor,
             audio_decoder=components.audio_vae_decoder if generate_audio else None,
             vocoder=components.vocoder if generate_audio else None,
             sampling_context=progress,

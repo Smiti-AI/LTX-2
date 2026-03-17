@@ -1,0 +1,574 @@
+nohup: ignoring input
+==============================================
+LTX-2 Skye Experiments: 9 runs (prompt types 1-3 × durations: 15 20 35 s)
+Output: /home/smiti-user/LTX-2/LTX2_output
+==============================================
+
+[1/9] PROMPT_TYPE=1, 15s, 704x896, 40 steps, seed 42
+================================================================================
+LTX Video/Audio Generation
+================================================================================
+INFO     Loading LTX-2 model from                            model_loader.py:329
+         /home/smiti-user/LTX-2/models/ltx-2.3-22b-dev.safet                    
+         ensors                                                                 
+DEBUG    Loading transformer...                              model_loader.py:334
+DEBUG    Loading video VAE encoder...                        model_loader.py:340
+DEBUG    Loading video VAE decoder...                        model_loader.py:346
+DEBUG    Loading audio VAE decoder...                        model_loader.py:352
+DEBUG    Loading vocoder...                                  model_loader.py:358
+DEBUG    Loading Gemma text encoder...                       model_loader.py:366
+Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
+Loading conditioning image from /home/smiti-user/LTX-2/input/sky_in_heli.jpg...
+
+================================================================================
+Generation Parameters
+================================================================================
+Mode: Image-to-Video (I2V)
+Prompt: High-quality 3D animation in the style of Paw Patrol, vibrant colors, clean CGI, cinematic lighting, bright and cheerful atmosphere, smooth character animation, Nick Jr aesthetic, 4k render, detailed textures, expressive facial expressions.
+
+Skye from Paw Patrol, the cute female cockapoo rescue puppy pilot, wearing her pink pilot goggles and pink vest, flying her small pink helicopter high in a bright blue sky with soft fluffy clouds. The helicopter gently hovers in the air while she sits in the cockpit.
+
+Skye looks directly into the camera and talks to the viewer like a cheerful kids TV host. She speaks clearly in FIRST PERSON about her own day. She is happy, excited, and very expressive.
+
+Dialogue (first person, speaking directly to camera):
+"Hi everyone! I had such a happy day today!"
+"I ate soooo many candies and sweets!"
+"It was so yummy and so much fun!"
+"But now I need to brush my teeth really well so they stay clean and healthy!"
+
+She laughs, smiles, and talks energetically while sitting in the helicopter.
+
+Camera: medium close-up inside the helicopter cockpit, Skye facing the camera.
+Motion: helicopter gently hovering in the sky with soft movement.
+Mood: joyful, playful, energetic children's show.
+Environment: bright daylight sky, soft clouds. static camera composition maintained for the entire clip
+Negative prompt: blurry, overexposed, static, low quality, distorted, ugly, worst quality, JPEG artifacts, extra fingers, deformed
+Resolution: 704x896
+Frames: 377 @ 25.0 fps
+Inference steps: 40
+CFG scale: 4.0
+STG scale: 1.0 (mode: stg_av, blocks: [29])
+Seed: 42
+Conditioning: Image (/home/smiti-user/LTX-2/input/sky_in_heli.jpg)
+Audio: Enabled (duration will match video: 15.08s)
+================================================================================
+
+Generating video + audio...
+Generating ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ step 40/40 0:08:20 ETA: 00:00
+✓ Video saved to /home/smiti-user/LTX-2/LTX2_output/skye_helicopter_pt1_15s_704x896_40steps_seed42.mp4
+
+================================================================================
+Generation complete!
+================================================================================
+Video saved to: /home/smiti-user/LTX-2/LTX2_output/skye_helicopter_pt1_15s_704x896_40steps_seed42.mp4
+
+[2/9] PROMPT_TYPE=1, 20s, 704x896, 40 steps, seed 42
+================================================================================
+LTX Video/Audio Generation
+================================================================================
+INFO     Loading LTX-2 model from                            model_loader.py:329
+         /home/smiti-user/LTX-2/models/ltx-2.3-22b-dev.safet                    
+         ensors                                                                 
+DEBUG    Loading transformer...                              model_loader.py:334
+DEBUG    Loading video VAE encoder...                        model_loader.py:340
+DEBUG    Loading video VAE decoder...                        model_loader.py:346
+DEBUG    Loading audio VAE decoder...                        model_loader.py:352
+DEBUG    Loading vocoder...                                  model_loader.py:358
+DEBUG    Loading Gemma text encoder...                       model_loader.py:366
+Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
+Loading conditioning image from /home/smiti-user/LTX-2/input/sky_in_heli.jpg...
+
+================================================================================
+Generation Parameters
+================================================================================
+Mode: Image-to-Video (I2V)
+Prompt: High-quality 3D animation in the style of Paw Patrol, vibrant colors, clean CGI, cinematic lighting, bright and cheerful atmosphere, smooth character animation, Nick Jr aesthetic, 4k render, detailed textures, expressive facial expressions.
+
+Skye from Paw Patrol, the cute female cockapoo rescue puppy pilot, wearing her pink pilot goggles and pink vest, flying her small pink helicopter high in a bright blue sky with soft fluffy clouds. The helicopter gently hovers in the air while she sits in the cockpit.
+
+Skye looks directly into the camera and talks to the viewer like a cheerful kids TV host. She speaks clearly in FIRST PERSON about her own day. She is happy, excited, and very expressive.
+
+Dialogue (first person, speaking directly to camera):
+"Hi everyone! I had such a happy day today!"
+"I ate soooo many candies and sweets!"
+"It was so yummy and so much fun!"
+"But now I need to brush my teeth really well so they stay clean and healthy!"
+
+She laughs, smiles, and talks energetically while sitting in the helicopter.
+
+Camera: medium close-up inside the helicopter cockpit, Skye facing the camera.
+Motion: helicopter gently hovering in the sky with soft movement.
+Mood: joyful, playful, energetic children's show.
+Environment: bright daylight sky, soft clouds. static camera composition maintained for the entire clip
+Negative prompt: blurry, overexposed, static, low quality, distorted, ugly, worst quality, JPEG artifacts, extra fingers, deformed
+Resolution: 704x896
+Frames: 497 @ 25.0 fps
+Inference steps: 40
+CFG scale: 4.0
+STG scale: 1.0 (mode: stg_av, blocks: [29])
+Seed: 42
+Conditioning: Image (/home/smiti-user/LTX-2/input/sky_in_heli.jpg)
+Audio: Enabled (duration will match video: 19.88s)
+================================================================================
+
+Generating video + audio...
+Generating ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ step 40/40 0:12:21 ETA: 00:00
+✓ Video saved to /home/smiti-user/LTX-2/LTX2_output/skye_helicopter_pt1_20s_704x896_40steps_seed42.mp4
+
+================================================================================
+Generation complete!
+================================================================================
+Video saved to: /home/smiti-user/LTX-2/LTX2_output/skye_helicopter_pt1_20s_704x896_40steps_seed42.mp4
+
+[3/9] PROMPT_TYPE=1, 35s, 704x896, 40 steps, seed 42
+================================================================================
+LTX Video/Audio Generation
+================================================================================
+INFO     Loading LTX-2 model from                            model_loader.py:329
+         /home/smiti-user/LTX-2/models/ltx-2.3-22b-dev.safet                    
+         ensors                                                                 
+DEBUG    Loading transformer...                              model_loader.py:334
+DEBUG    Loading video VAE encoder...                        model_loader.py:340
+DEBUG    Loading video VAE decoder...                        model_loader.py:346
+DEBUG    Loading audio VAE decoder...                        model_loader.py:352
+DEBUG    Loading vocoder...                                  model_loader.py:358
+DEBUG    Loading Gemma text encoder...                       model_loader.py:366
+Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
+Loading conditioning image from /home/smiti-user/LTX-2/input/sky_in_heli.jpg...
+
+================================================================================
+Generation Parameters
+================================================================================
+Mode: Image-to-Video (I2V)
+Prompt: High-quality 3D animation in the style of Paw Patrol, vibrant colors, clean CGI, cinematic lighting, bright and cheerful atmosphere, smooth character animation, Nick Jr aesthetic, 4k render, detailed textures, expressive facial expressions.
+
+Skye from Paw Patrol, the cute female cockapoo rescue puppy pilot, wearing her pink pilot goggles and pink vest, flying her small pink helicopter high in a bright blue sky with soft fluffy clouds. The helicopter gently hovers in the air while she sits in the cockpit.
+
+Skye looks directly into the camera and talks to the viewer like a cheerful kids TV host. She speaks clearly in FIRST PERSON about her own day. She is happy, excited, and very expressive.
+
+Dialogue (first person, speaking directly to camera):
+"Hi everyone! I had such a happy day today!"
+"I ate soooo many candies and sweets!"
+"It was so yummy and so much fun!"
+"But now I need to brush my teeth really well so they stay clean and healthy!"
+
+She laughs, smiles, and talks energetically while sitting in the helicopter.
+
+Camera: medium close-up inside the helicopter cockpit, Skye facing the camera.
+Motion: helicopter gently hovering in the sky with soft movement.
+Mood: joyful, playful, energetic children's show.
+Environment: bright daylight sky, soft clouds. static camera composition maintained for the entire clip
+Negative prompt: blurry, overexposed, static, low quality, distorted, ugly, worst quality, JPEG artifacts, extra fingers, deformed
+Resolution: 704x896
+Frames: 873 @ 25.0 fps
+Inference steps: 40
+CFG scale: 4.0
+STG scale: 1.0 (mode: stg_av, blocks: [29])
+Seed: 42
+Conditioning: Image (/home/smiti-user/LTX-2/input/sky_in_heli.jpg)
+Audio: Enabled (duration will match video: 34.92s)
+================================================================================
+
+Generating video + audio...
+Generating ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ step 40/40 0:30:09 ETA: 00:00
+✓ Video saved to /home/smiti-user/LTX-2/LTX2_output/skye_helicopter_pt1_35s_704x896_40steps_seed42.mp4
+
+================================================================================
+Generation complete!
+================================================================================
+Video saved to: /home/smiti-user/LTX-2/LTX2_output/skye_helicopter_pt1_35s_704x896_40steps_seed42.mp4
+
+[4/9] PROMPT_TYPE=2, 15s, 704x896, 40 steps, seed 42
+================================================================================
+LTX Video/Audio Generation
+================================================================================
+INFO     Loading LTX-2 model from                            model_loader.py:329
+         /home/smiti-user/LTX-2/models/ltx-2.3-22b-dev.safet                    
+         ensors                                                                 
+DEBUG    Loading transformer...                              model_loader.py:334
+DEBUG    Loading video VAE encoder...                        model_loader.py:340
+DEBUG    Loading video VAE decoder...                        model_loader.py:346
+DEBUG    Loading audio VAE decoder...                        model_loader.py:352
+DEBUG    Loading vocoder...                                  model_loader.py:358
+DEBUG    Loading Gemma text encoder...                       model_loader.py:366
+Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
+Loading conditioning image from /home/smiti-user/LTX-2/input/sky_in_heli.jpg...
+
+================================================================================
+Generation Parameters
+================================================================================
+Mode: Image-to-Video (I2V)
+Prompt: High-quality 3D animation in the style of Paw Patrol, vibrant colors, clean CGI, cinematic lighting, bright cheerful atmosphere, smooth character animation, Nick Jr aesthetic, 4k render, detailed textures, expressive facial expressions.
+
+Skye from Paw Patrol, the female cockapoo rescue puppy pilot wearing pink pilot goggles and a pink vest, sitting inside her small pink helicopter. The helicopter is hovering in a bright blue sky with soft fluffy clouds.
+
+IMPORTANT: The entire video is ONE continuous shot. The camera angle does NOT change. No cuts, no scene transitions, no jump cuts, no camera switches.
+
+The camera stays fixed in a stable medium close-up inside the helicopter cockpit. Skye remains centered in the frame and faces the camera the whole time. The helicopter gently hovers but the framing stays consistent.
+
+Skye looks directly into the camera and talks to the viewer like a cheerful kids TV host. She speaks in FIRST PERSON about her own day. She is happy, excited and expressive.
+
+Dialogue (first person, speaking to camera):
+"Hi everyone! I had such a happy day today!"
+"I ate soooo many candies and sweets!"
+"It was so yummy and so much fun!"
+"But now I need to brush my teeth really well so they stay clean and healthy!"
+
+Her mouth movements match the speech. She smiles, laughs and talks energetically.
+
+Motion: only subtle animation — slight helicopter hover, small head movement, blinking, natural mouth movement.
+Camera: locked camera, stable framing, no zoom, no rotation, no angle change.
+Shot: single continuous shot for the entire clip.
+Mood: joyful, playful children's show.
+Environment: bright daylight sky with soft clouds. static camera composition maintained for the entire clip
+Negative prompt: scene change, shot change, jump cut, camera switch, camera movement, zoom, pan, rotation, changing angle, changing perspective, multiple scenes, montage, cinematic cuts, dynamic camera, blurry, low quality, compression artifacts, distorted face, deformed body, extra limbs, extra fingers
+Resolution: 704x896
+Frames: 377 @ 25.0 fps
+Inference steps: 40
+CFG scale: 4.0
+STG scale: 1.0 (mode: stg_av, blocks: [29])
+Seed: 42
+Conditioning: Image (/home/smiti-user/LTX-2/input/sky_in_heli.jpg)
+Audio: Enabled (duration will match video: 15.08s)
+================================================================================
+
+Generating video + audio...
+Generating ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ step 40/40 0:08:20 ETA: 00:00
+✓ Video saved to /home/smiti-user/LTX-2/LTX2_output/skye_helicopter_pt2_15s_704x896_40steps_seed42.mp4
+
+================================================================================
+Generation complete!
+================================================================================
+Video saved to: /home/smiti-user/LTX-2/LTX2_output/skye_helicopter_pt2_15s_704x896_40steps_seed42.mp4
+
+[5/9] PROMPT_TYPE=2, 20s, 704x896, 40 steps, seed 42
+================================================================================
+LTX Video/Audio Generation
+================================================================================
+INFO     Loading LTX-2 model from                            model_loader.py:329
+         /home/smiti-user/LTX-2/models/ltx-2.3-22b-dev.safet                    
+         ensors                                                                 
+DEBUG    Loading transformer...                              model_loader.py:334
+DEBUG    Loading video VAE encoder...                        model_loader.py:340
+DEBUG    Loading video VAE decoder...                        model_loader.py:346
+DEBUG    Loading audio VAE decoder...                        model_loader.py:352
+DEBUG    Loading vocoder...                                  model_loader.py:358
+DEBUG    Loading Gemma text encoder...                       model_loader.py:366
+Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
+Loading conditioning image from /home/smiti-user/LTX-2/input/sky_in_heli.jpg...
+
+================================================================================
+Generation Parameters
+================================================================================
+Mode: Image-to-Video (I2V)
+Prompt: High-quality 3D animation in the style of Paw Patrol, vibrant colors, clean CGI, cinematic lighting, bright cheerful atmosphere, smooth character animation, Nick Jr aesthetic, 4k render, detailed textures, expressive facial expressions.
+
+Skye from Paw Patrol, the female cockapoo rescue puppy pilot wearing pink pilot goggles and a pink vest, sitting inside her small pink helicopter. The helicopter is hovering in a bright blue sky with soft fluffy clouds.
+
+IMPORTANT: The entire video is ONE continuous shot. The camera angle does NOT change. No cuts, no scene transitions, no jump cuts, no camera switches.
+
+The camera stays fixed in a stable medium close-up inside the helicopter cockpit. Skye remains centered in the frame and faces the camera the whole time. The helicopter gently hovers but the framing stays consistent.
+
+Skye looks directly into the camera and talks to the viewer like a cheerful kids TV host. She speaks in FIRST PERSON about her own day. She is happy, excited and expressive.
+
+Dialogue (first person, speaking to camera):
+"Hi everyone! I had such a happy day today!"
+"I ate soooo many candies and sweets!"
+"It was so yummy and so much fun!"
+"But now I need to brush my teeth really well so they stay clean and healthy!"
+
+Her mouth movements match the speech. She smiles, laughs and talks energetically.
+
+Motion: only subtle animation — slight helicopter hover, small head movement, blinking, natural mouth movement.
+Camera: locked camera, stable framing, no zoom, no rotation, no angle change.
+Shot: single continuous shot for the entire clip.
+Mood: joyful, playful children's show.
+Environment: bright daylight sky with soft clouds. static camera composition maintained for the entire clip
+Negative prompt: scene change, shot change, jump cut, camera switch, camera movement, zoom, pan, rotation, changing angle, changing perspective, multiple scenes, montage, cinematic cuts, dynamic camera, blurry, low quality, compression artifacts, distorted face, deformed body, extra limbs, extra fingers
+Resolution: 704x896
+Frames: 497 @ 25.0 fps
+Inference steps: 40
+CFG scale: 4.0
+STG scale: 1.0 (mode: stg_av, blocks: [29])
+Seed: 42
+Conditioning: Image (/home/smiti-user/LTX-2/input/sky_in_heli.jpg)
+Audio: Enabled (duration will match video: 19.88s)
+================================================================================
+
+Generating video + audio...
+Generating ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ step 40/40 0:12:20 ETA: 00:00
+✓ Video saved to /home/smiti-user/LTX-2/LTX2_output/skye_helicopter_pt2_20s_704x896_40steps_seed42.mp4
+
+================================================================================
+Generation complete!
+================================================================================
+Video saved to: /home/smiti-user/LTX-2/LTX2_output/skye_helicopter_pt2_20s_704x896_40steps_seed42.mp4
+
+[6/9] PROMPT_TYPE=2, 35s, 704x896, 40 steps, seed 42
+================================================================================
+LTX Video/Audio Generation
+================================================================================
+INFO     Loading LTX-2 model from                            model_loader.py:329
+         /home/smiti-user/LTX-2/models/ltx-2.3-22b-dev.safet                    
+         ensors                                                                 
+DEBUG    Loading transformer...                              model_loader.py:334
+DEBUG    Loading video VAE encoder...                        model_loader.py:340
+DEBUG    Loading video VAE decoder...                        model_loader.py:346
+DEBUG    Loading audio VAE decoder...                        model_loader.py:352
+DEBUG    Loading vocoder...                                  model_loader.py:358
+DEBUG    Loading Gemma text encoder...                       model_loader.py:366
+Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
+Loading conditioning image from /home/smiti-user/LTX-2/input/sky_in_heli.jpg...
+
+================================================================================
+Generation Parameters
+================================================================================
+Mode: Image-to-Video (I2V)
+Prompt: High-quality 3D animation in the style of Paw Patrol, vibrant colors, clean CGI, cinematic lighting, bright cheerful atmosphere, smooth character animation, Nick Jr aesthetic, 4k render, detailed textures, expressive facial expressions.
+
+Skye from Paw Patrol, the female cockapoo rescue puppy pilot wearing pink pilot goggles and a pink vest, sitting inside her small pink helicopter. The helicopter is hovering in a bright blue sky with soft fluffy clouds.
+
+IMPORTANT: The entire video is ONE continuous shot. The camera angle does NOT change. No cuts, no scene transitions, no jump cuts, no camera switches.
+
+The camera stays fixed in a stable medium close-up inside the helicopter cockpit. Skye remains centered in the frame and faces the camera the whole time. The helicopter gently hovers but the framing stays consistent.
+
+Skye looks directly into the camera and talks to the viewer like a cheerful kids TV host. She speaks in FIRST PERSON about her own day. She is happy, excited and expressive.
+
+Dialogue (first person, speaking to camera):
+"Hi everyone! I had such a happy day today!"
+"I ate soooo many candies and sweets!"
+"It was so yummy and so much fun!"
+"But now I need to brush my teeth really well so they stay clean and healthy!"
+
+Her mouth movements match the speech. She smiles, laughs and talks energetically.
+
+Motion: only subtle animation — slight helicopter hover, small head movement, blinking, natural mouth movement.
+Camera: locked camera, stable framing, no zoom, no rotation, no angle change.
+Shot: single continuous shot for the entire clip.
+Mood: joyful, playful children's show.
+Environment: bright daylight sky with soft clouds. static camera composition maintained for the entire clip
+Negative prompt: scene change, shot change, jump cut, camera switch, camera movement, zoom, pan, rotation, changing angle, changing perspective, multiple scenes, montage, cinematic cuts, dynamic camera, blurry, low quality, compression artifacts, distorted face, deformed body, extra limbs, extra fingers
+Resolution: 704x896
+Frames: 873 @ 25.0 fps
+Inference steps: 40
+CFG scale: 4.0
+STG scale: 1.0 (mode: stg_av, blocks: [29])
+Seed: 42
+Conditioning: Image (/home/smiti-user/LTX-2/input/sky_in_heli.jpg)
+Audio: Enabled (duration will match video: 34.92s)
+================================================================================
+
+Generating video + audio...
+Generating ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ step 40/40 0:30:09 ETA: 00:00
+✓ Video saved to /home/smiti-user/LTX-2/LTX2_output/skye_helicopter_pt2_35s_704x896_40steps_seed42.mp4
+
+================================================================================
+Generation complete!
+================================================================================
+Video saved to: /home/smiti-user/LTX-2/LTX2_output/skye_helicopter_pt2_35s_704x896_40steps_seed42.mp4
+
+[7/9] PROMPT_TYPE=3, 15s, 704x896, 40 steps, seed 42
+================================================================================
+LTX Video/Audio Generation
+================================================================================
+INFO     Loading LTX-2 model from                            model_loader.py:329
+         /home/smiti-user/LTX-2/models/ltx-2.3-22b-dev.safet                    
+         ensors                                                                 
+DEBUG    Loading transformer...                              model_loader.py:334
+DEBUG    Loading video VAE encoder...                        model_loader.py:340
+DEBUG    Loading video VAE decoder...                        model_loader.py:346
+DEBUG    Loading audio VAE decoder...                        model_loader.py:352
+DEBUG    Loading vocoder...                                  model_loader.py:358
+DEBUG    Loading Gemma text encoder...                       model_loader.py:366
+Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
+Loading conditioning image from /home/smiti-user/LTX-2/input/sky_in_heli.jpg...
+
+================================================================================
+Generation Parameters
+================================================================================
+Mode: Image-to-Video (I2V)
+Prompt: Stable single-shot 3D animated scene of Skye from Paw Patrol inside her pink rescue helicopter cockpit. High-quality children's TV animation, Paw Patrol CGI style, vibrant colors, clean rendering, cinematic but simple lighting, smooth animation, detailed textures.
+
+Scene setup:
+Skye, the female cockapoo rescue puppy wearing pink pilot goggles and a pink vest, sits in the pilot seat of her pink helicopter. The helicopter is calmly hovering in a bright blue sky with soft clouds visible through the cockpit window.
+
+Camera and framing:
+Locked camera.
+Single continuous shot.
+Medium close-up framing from inside the cockpit.
+Skye centered in frame and facing forward.
+No camera movement, no cuts, no transitions, no angle change.
+
+Action:
+Skye speaks directly to the viewer like a cheerful children's show host. She talks in first person about her day. Her mouth moves naturally while speaking, with small head movements, blinking, and expressive facial animation.
+
+Dialogue:
+"Hi friends! Guess what? I had such a fun day today!"
+"I ate lots and lots of yummy candy!"
+"It was super sweet and really fun!"
+"But now I need to brush my teeth really well!"
+
+Motion:
+Very gentle helicopter hover motion only.
+Subtle character animation: blinking, small head movement, natural speaking mouth motion.
+
+Mood:
+Bright, friendly, playful children's show atmosphere. static camera composition maintained for the entire clip
+Negative prompt: scene change, shot change, jump cut, camera switch, camera movement, zoom, pan, rotation, changing angle, changing perspective, multiple scenes, montage, cinematic cuts, dynamic camera, blurry, low quality, compression artifacts, distorted face, deformed body, extra limbs, extra fingers
+Resolution: 704x896
+Frames: 377 @ 25.0 fps
+Inference steps: 40
+CFG scale: 4.0
+STG scale: 1.0 (mode: stg_av, blocks: [29])
+Seed: 42
+Conditioning: Image (/home/smiti-user/LTX-2/input/sky_in_heli.jpg)
+Audio: Enabled (duration will match video: 15.08s)
+================================================================================
+
+Generating video + audio...
+Generating ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ step 40/40 0:08:19 ETA: 00:00
+✓ Video saved to /home/smiti-user/LTX-2/LTX2_output/skye_helicopter_pt3_15s_704x896_40steps_seed42.mp4
+
+================================================================================
+Generation complete!
+================================================================================
+Video saved to: /home/smiti-user/LTX-2/LTX2_output/skye_helicopter_pt3_15s_704x896_40steps_seed42.mp4
+
+[8/9] PROMPT_TYPE=3, 20s, 704x896, 40 steps, seed 42
+================================================================================
+LTX Video/Audio Generation
+================================================================================
+INFO     Loading LTX-2 model from                            model_loader.py:329
+         /home/smiti-user/LTX-2/models/ltx-2.3-22b-dev.safet                    
+         ensors                                                                 
+DEBUG    Loading transformer...                              model_loader.py:334
+DEBUG    Loading video VAE encoder...                        model_loader.py:340
+DEBUG    Loading video VAE decoder...                        model_loader.py:346
+DEBUG    Loading audio VAE decoder...                        model_loader.py:352
+DEBUG    Loading vocoder...                                  model_loader.py:358
+DEBUG    Loading Gemma text encoder...                       model_loader.py:366
+Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
+Loading conditioning image from /home/smiti-user/LTX-2/input/sky_in_heli.jpg...
+
+================================================================================
+Generation Parameters
+================================================================================
+Mode: Image-to-Video (I2V)
+Prompt: Stable single-shot 3D animated scene of Skye from Paw Patrol inside her pink rescue helicopter cockpit. High-quality children's TV animation, Paw Patrol CGI style, vibrant colors, clean rendering, cinematic but simple lighting, smooth animation, detailed textures.
+
+Scene setup:
+Skye, the female cockapoo rescue puppy wearing pink pilot goggles and a pink vest, sits in the pilot seat of her pink helicopter. The helicopter is calmly hovering in a bright blue sky with soft clouds visible through the cockpit window.
+
+Camera and framing:
+Locked camera.
+Single continuous shot.
+Medium close-up framing from inside the cockpit.
+Skye centered in frame and facing forward.
+No camera movement, no cuts, no transitions, no angle change.
+
+Action:
+Skye speaks directly to the viewer like a cheerful children's show host. She talks in first person about her day. Her mouth moves naturally while speaking, with small head movements, blinking, and expressive facial animation.
+
+Dialogue:
+"Hi friends! Guess what? I had such a fun day today!"
+"I ate lots and lots of yummy candy!"
+"It was super sweet and really fun!"
+"But now I need to brush my teeth really well!"
+
+Motion:
+Very gentle helicopter hover motion only.
+Subtle character animation: blinking, small head movement, natural speaking mouth motion.
+
+Mood:
+Bright, friendly, playful children's show atmosphere. static camera composition maintained for the entire clip
+Negative prompt: scene change, shot change, jump cut, camera switch, camera movement, zoom, pan, rotation, changing angle, changing perspective, multiple scenes, montage, cinematic cuts, dynamic camera, blurry, low quality, compression artifacts, distorted face, deformed body, extra limbs, extra fingers
+Resolution: 704x896
+Frames: 497 @ 25.0 fps
+Inference steps: 40
+CFG scale: 4.0
+STG scale: 1.0 (mode: stg_av, blocks: [29])
+Seed: 42
+Conditioning: Image (/home/smiti-user/LTX-2/input/sky_in_heli.jpg)
+Audio: Enabled (duration will match video: 19.88s)
+================================================================================
+
+Generating video + audio...
+Generating ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ step 40/40 0:12:21 ETA: 00:00
+✓ Video saved to /home/smiti-user/LTX-2/LTX2_output/skye_helicopter_pt3_20s_704x896_40steps_seed42.mp4
+
+================================================================================
+Generation complete!
+================================================================================
+Video saved to: /home/smiti-user/LTX-2/LTX2_output/skye_helicopter_pt3_20s_704x896_40steps_seed42.mp4
+
+[9/9] PROMPT_TYPE=3, 35s, 704x896, 40 steps, seed 42
+================================================================================
+LTX Video/Audio Generation
+================================================================================
+INFO     Loading LTX-2 model from                            model_loader.py:329
+         /home/smiti-user/LTX-2/models/ltx-2.3-22b-dev.safet                    
+         ensors                                                                 
+DEBUG    Loading transformer...                              model_loader.py:334
+DEBUG    Loading video VAE encoder...                        model_loader.py:340
+DEBUG    Loading video VAE decoder...                        model_loader.py:346
+DEBUG    Loading audio VAE decoder...                        model_loader.py:352
+DEBUG    Loading vocoder...                                  model_loader.py:358
+DEBUG    Loading Gemma text encoder...                       model_loader.py:366
+Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
+Loading conditioning image from /home/smiti-user/LTX-2/input/sky_in_heli.jpg...
+
+================================================================================
+Generation Parameters
+================================================================================
+Mode: Image-to-Video (I2V)
+Prompt: Stable single-shot 3D animated scene of Skye from Paw Patrol inside her pink rescue helicopter cockpit. High-quality children's TV animation, Paw Patrol CGI style, vibrant colors, clean rendering, cinematic but simple lighting, smooth animation, detailed textures.
+
+Scene setup:
+Skye, the female cockapoo rescue puppy wearing pink pilot goggles and a pink vest, sits in the pilot seat of her pink helicopter. The helicopter is calmly hovering in a bright blue sky with soft clouds visible through the cockpit window.
+
+Camera and framing:
+Locked camera.
+Single continuous shot.
+Medium close-up framing from inside the cockpit.
+Skye centered in frame and facing forward.
+No camera movement, no cuts, no transitions, no angle change.
+
+Action:
+Skye speaks directly to the viewer like a cheerful children's show host. She talks in first person about her day. Her mouth moves naturally while speaking, with small head movements, blinking, and expressive facial animation.
+
+Dialogue:
+"Hi friends! Guess what? I had such a fun day today!"
+"I ate lots and lots of yummy candy!"
+"It was super sweet and really fun!"
+"But now I need to brush my teeth really well!"
+
+Motion:
+Very gentle helicopter hover motion only.
+Subtle character animation: blinking, small head movement, natural speaking mouth motion.
+
+Mood:
+Bright, friendly, playful children's show atmosphere. static camera composition maintained for the entire clip
+Negative prompt: scene change, shot change, jump cut, camera switch, camera movement, zoom, pan, rotation, changing angle, changing perspective, multiple scenes, montage, cinematic cuts, dynamic camera, blurry, low quality, compression artifacts, distorted face, deformed body, extra limbs, extra fingers
+Resolution: 704x896
+Frames: 873 @ 25.0 fps
+Inference steps: 40
+CFG scale: 4.0
+STG scale: 1.0 (mode: stg_av, blocks: [29])
+Seed: 42
+Conditioning: Image (/home/smiti-user/LTX-2/input/sky_in_heli.jpg)
+Audio: Enabled (duration will match video: 34.92s)
+================================================================================
+
+Generating video + audio...
+Generating ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ step 40/40 0:30:09 ETA: 00:00
+✓ Video saved to /home/smiti-user/LTX-2/LTX2_output/skye_helicopter_pt3_35s_704x896_40steps_seed42.mp4
+
+================================================================================
+Generation complete!
+================================================================================
+Video saved to: /home/smiti-user/LTX-2/LTX2_output/skye_helicopter_pt3_35s_704x896_40steps_seed42.mp4
+
+==============================================
+All 9 experiments completed!
+Outputs in: /home/smiti-user/LTX-2/LTX2_output
+==============================================
