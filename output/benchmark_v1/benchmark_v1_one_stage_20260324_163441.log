@@ -1,0 +1,22 @@
+Run configuration (resolved):
+BENCHMARK_DIR = /home/smiti-user/LTX-2/input/benchmark_v1
+OUTPUT_DIR = /home/smiti-user/LTX-2/output/benchmark_v1
+CHECKPOINT = /home/smiti-user/LTX-2/models/ltx-2.3-22b-dev.safetensors
+GEMMA_ROOT = /home/smiti-user/LTX-2/models/gemma-3-12b-it-qat-q4_0-unquantized
+DISTILLED_LORA = /home/smiti-user/LTX-2/models/ltx-2.3-22b-distilled-lora-384.safetensors
+SPATIAL_UPSAMPLER = /home/smiti-user/LTX-2/models/ltx-2.3-spatial-upscaler-x2-1.0.safetensors
+BENCHMARK_PIPELINE = one_stage
+BENCHMARK_PROFILE = (unset)
+EFFECTIVE_PIPELINE = one_stage
+RESOLUTION_SNAP = 32
+PYTHON_MODULE = ltx_pipelines.ti2vid_one_stage
+SEEDS = 42
+PROMPT_INDEX = 0
+NUM_INFERENCE_STEPS = 50
+
+[RUN] skye_chase_crosswalk_safety (seed=42) -> /home/smiti-user/LTX-2/output/benchmark_v1/skye_chase_crosswalk_safety_1stage_p0_5s_1280x672.mp4
+[RUN] skye_chase_crosswalk_safety (seed=42) -> /home/smiti-user/LTX-2/output/benchmark_v1/skye_chase_crosswalk_safety_1stage_p0_5s_1280x672.mp4
+/usr/lib/python3.10/runpy.py:126: RuntimeWarning: 'ltx_pipelines.ti2vid_one_stage' found in sys.modules after import of package 'ltx_pipelines', but prior to execution of 'ltx_pipelines.ti2vid_one_stage'; this may result in unpredictable behaviour
+  warn(RuntimeWarning(msg))
+Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
+  0%|          | 0/50 [00:00<?, ?it/s]  2%|▏         | 1/50 [00:05<04:06,  5.03s/it]  4%|▍         | 2/50 [00:10<04:01,  5.02s/it]  6%|▌         | 3/50 [00:15<03:55,  5.02s/it]  8%|▊         | 4/50 [00:20<03:51,  5.02s/it] 10%|█         | 5/50 [00:25<03:45,  5.02s/it] 12%|█▏        | 6/50 [00:30<03:40,  5.01s/it] 14%|█▍        | 7/50 [00:35<03:35,  5.01s/it] 16%|█▌        | 8/50 [00:40<03:30,  5.01s/it] 18%|█▊        | 9/50 [00:45<03:25,  5.01s/it] 20%|██        | 10/50 [00:50<03:20,  5.01s/it] 22%|██▏       | 11/50 [00:55<03:15,  5.01s/it] 24%|██▍       | 12/50 [01:00<03:10,  5.01s/it] 26%|██▌       | 13/50 [01:05<03:05,  5.01s/it] 28%|██▊       | 14/50 [01:10<03:00,  5.01s/it] 30%|███       | 15/50 [01:15<02:55,  5.01s/it] 32%|███▏      | 16/50 [01:20<02:50,  5.01s/it] 34%|███▍      | 17/50 [01:25<02:45,  5.01s/it] 36%|███▌      | 18/50 [01:30<02:40,  5.01s/it] 38%|███▊      | 19/50 [01:35<02:35,  5.01s/it] 40%|████      | 20/50 [01:40<02:30,  5.01s/it] 42%|████▏     | 21/50 [01:45<02:25,  5.01s/it] 44%|████▍     | 22/50 [01:50<02:20,  5.01s/it] 46%|████▌     | 23/50 [01:55<02:15,  5.02s/it] 48%|████▊     | 24/50 [02:00<02:10,  5.01s/it] 50%|█████     | 25/50 [02:05<02:05,  5.01s/it] 52%|█████▏    | 26/50 [02:10<02:00,  5.01s/it] 54%|█████▍    | 27/50 [02:15<01:55,  5.01s/it] 56%|█████▌    | 28/50 [02:20<01:50,  5.01s/it] 58%|█████▊    | 29/50 [02:25<01:45,  5.01s/it] 60%|██████    | 30/50 [02:30<01:40,  5.01s/it] 62%|██████▏   | 31/50 [02:35<01:35,  5.01s/it] 64%|██████▍   | 32/50 [02:40<01:30,  5.01s/it] 66%|██████▌   | 33/50 [02:45<01:25,  5.01s/it] 68%|██████▊   | 34/50 [02:50<01:20,  5.01s/it] 70%|███████   | 35/50 [02:55<01:15,  5.01s/it] 72%|███████▏  | 36/50 [03:00<01:10,  5.01s/it]
