@@ -19,4 +19,4 @@ NUM_INFERENCE_STEPS = 30
 /usr/lib/python3.10/runpy.py:126: RuntimeWarning: 'ltx_pipelines.ti2vid_one_stage' found in sys.modules after import of package 'ltx_pipelines', but prior to execution of 'ltx_pipelines.ti2vid_one_stage'; this may result in unpredictable behaviour
   warn(RuntimeWarning(msg))
 Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
-  0%|          | 0/30 [00:00<?, ?it/s]  3%|▎         | 1/30 [00:53<26:02, 53.86s/it]  7%|▋         | 2/30 [01:47<25:07, 53.85s/it]
+  0%|          | 0/30 [00:00<?, ?it/s]  3%|▎         | 1/30 [00:53<26:02, 53.86s/it]  7%|▋         | 2/30 [01:47<25:07, 53.85s/it] 10%|█         | 3/30 [02:41<24:14, 53.87s/it] 13%|█▎        | 4/30 [03:35<23:20, 53.85s/it] 17%|█▋        | 5/30 [04:29<22:25, 53.83s/it]
