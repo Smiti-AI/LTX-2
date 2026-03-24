@@ -1,0 +1,61 @@
+[RUN] skye_chase_crosswalk_safety (seed=42) -> /home/smiti-user/LTX-2/output/benchmark_v1/skye_chase_crosswalk_safety_1stage_p0_1280x672.mp4
+[RUN] skye_chase_crosswalk_safety (seed=42) -> /home/smiti-user/LTX-2/output/benchmark_v1/skye_chase_crosswalk_safety_1stage_p0_1280x672.mp4
+/usr/lib/python3.10/runpy.py:126: RuntimeWarning: 'ltx_pipelines.ti2vid_one_stage' found in sys.modules after import of package 'ltx_pipelines', but prior to execution of 'ltx_pipelines.ti2vid_one_stage'; this may result in unpredictable behaviour
+  warn(RuntimeWarning(msg))
+Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
+  0%|          | 0/30 [00:00<?, ?it/s]  3%|▎         | 1/30 [00:09<04:22,  9.06s/it]  7%|▋         | 2/30 [00:18<04:13,  9.06s/it] 10%|█         | 3/30 [00:27<04:04,  9.07s/it] 13%|█▎        | 4/30 [00:36<03:55,  9.07s/it] 17%|█▋        | 5/30 [00:45<03:46,  9.08s/it] 20%|██        | 6/30 [00:54<03:37,  9.08s/it] 23%|██▎       | 7/30 [01:03<03:28,  9.08s/it] 27%|██▋       | 8/30 [01:12<03:19,  9.09s/it] 30%|███       | 9/30 [01:21<03:10,  9.09s/it] 33%|███▎      | 10/30 [01:30<03:01,  9.09s/it] 37%|███▋      | 11/30 [01:39<02:52,  9.09s/it] 40%|████      | 12/30 [01:49<02:43,  9.09s/it] 43%|████▎     | 13/30 [01:58<02:34,  9.09s/it] 47%|████▋     | 14/30 [02:07<02:25,  9.09s/it] 50%|█████     | 15/30 [02:16<02:16,  9.09s/it] 53%|█████▎    | 16/30 [02:25<02:07,  9.09s/it] 57%|█████▋    | 17/30 [02:34<01:58,  9.09s/it] 60%|██████    | 18/30 [02:43<01:49,  9.09s/it] 63%|██████▎   | 19/30 [02:52<01:40,  9.09s/it] 67%|██████▋   | 20/30 [03:01<01:30,  9.09s/it] 70%|███████   | 21/30 [03:10<01:21,  9.09s/it] 73%|███████▎  | 22/30 [03:19<01:12,  9.09s/it] 77%|███████▋  | 23/30 [03:29<01:03,  9.09s/it] 80%|████████  | 24/30 [03:38<00:54,  9.09s/it] 83%|████████▎ | 25/30 [03:47<00:45,  9.08s/it] 87%|████████▋ | 26/30 [03:56<00:36,  9.07s/it] 90%|█████████ | 27/30 [04:05<00:27,  9.06s/it] 93%|█████████▎| 28/30 [04:14<00:18,  9.06s/it] 97%|█████████▋| 29/30 [04:23<00:09,  9.05s/it]100%|██████████| 30/30 [04:32<00:00,  9.05s/it]100%|██████████| 30/30 [04:32<00:00,  9.08s/it]
+Traceback (most recent call last):
+  File "/usr/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/usr/lib/python3.10/runpy.py", line 86, in _run_code
+    exec(code, run_globals)
+  File "/home/smiti-user/LTX-2/packages/ltx-pipelines/src/ltx_pipelines/ti2vid_one_stage.py", line 222, in <module>
+    main()
+  File "/home/smiti-user/LTX-2/.venv/lib/python3.10/site-packages/torch/utils/_contextlib.py", line 120, in decorate_context
+    return func(*args, **kwargs)
+  File "/home/smiti-user/LTX-2/packages/ltx-pipelines/src/ltx_pipelines/ti2vid_one_stage.py", line 212, in main
+    encode_video(
+  File "/home/smiti-user/LTX-2/packages/ltx-pipelines/src/ltx_pipelines/utils/media_io.py", line 200, in encode_video
+    first_chunk = next(video)
+  File "/home/smiti-user/LTX-2/packages/ltx-core/src/ltx_core/model/video_vae/video_vae.py", line 992, in decode_video
+    decoded_video = video_decoder(latent, generator=generator)
+  File "/home/smiti-user/LTX-2/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1775, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/smiti-user/LTX-2/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1786, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/smiti-user/LTX-2/packages/ltx-core/src/ltx_core/model/video_vae/video_vae.py", line 733, in forward
+    sample = up_block(sample, **block_kwargs)
+  File "/home/smiti-user/LTX-2/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1775, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/smiti-user/LTX-2/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1786, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/smiti-user/LTX-2/packages/ltx-core/src/ltx_core/model/video_vae/resnet.py", line 270, in forward
+    hidden_states = resnet(
+  File "/home/smiti-user/LTX-2/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1775, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/smiti-user/LTX-2/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1786, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/smiti-user/LTX-2/packages/ltx-core/src/ltx_core/model/video_vae/resnet.py", line 151, in forward
+    hidden_states = self.conv1(hidden_states, causal=causal)
+  File "/home/smiti-user/LTX-2/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1775, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/smiti-user/LTX-2/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1786, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/smiti-user/LTX-2/packages/ltx-core/src/ltx_core/model/video_vae/convolution.py", line 312, in forward
+    x = self.conv(x)
+  File "/home/smiti-user/LTX-2/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1775, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/smiti-user/LTX-2/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1786, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/smiti-user/LTX-2/.venv/lib/python3.10/site-packages/torch/nn/modules/conv.py", line 717, in forward
+    return self._conv_forward(input, self.weight, self.bias)
+  File "/home/smiti-user/LTX-2/.venv/lib/python3.10/site-packages/torch/nn/modules/conv.py", line 712, in _conv_forward
+    return F.conv3d(
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 66.79 GiB. GPU 0 has a total capacity of 79.19 GiB of which 35.56 GiB is free. Including non-PyTorch memory, this process has 43.62 GiB memory in use. Of the allocated memory 10.75 GiB is allocated by PyTorch, and 32.20 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+[FAIL] skye_chase_crosswalk_safety (seed=42)
+[RUN] skye_chase_crosswalk_safety_chase_talk (seed=42) -> /home/smiti-user/LTX-2/output/benchmark_v1/skye_chase_crosswalk_safety_chase_talk_1stage_p0_1280x672.mp4
+[RUN] skye_chase_crosswalk_safety_chase_talk (seed=42) -> /home/smiti-user/LTX-2/output/benchmark_v1/skye_chase_crosswalk_safety_chase_talk_1stage_p0_1280x672.mp4
+/usr/lib/python3.10/runpy.py:126: RuntimeWarning: 'ltx_pipelines.ti2vid_one_stage' found in sys.modules after import of package 'ltx_pipelines', but prior to execution of 'ltx_pipelines.ti2vid_one_stage'; this may result in unpredictable behaviour
+  warn(RuntimeWarning(msg))
+Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
+  0%|          | 0/30 [00:00<?, ?it/s]  3%|▎         | 1/30 [00:12<05:59, 12.39s/it]  7%|▋         | 2/30 [00:24<05:46, 12.38s/it] 10%|█         | 3/30 [00:37<05:34, 12.39s/it][FAIL] skye_chase_crosswalk_safety_chase_talk (seed=42)

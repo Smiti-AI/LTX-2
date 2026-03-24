@@ -1,0 +1,22 @@
+Run configuration (resolved):
+BENCHMARK_DIR = /home/smiti-user/LTX-2/input/benchmark_v1
+OUTPUT_DIR = /home/smiti-user/LTX-2/output/benchmark_v1_fal
+CHECKPOINT = /home/smiti-user/LTX-2/models/ltx-2.3-22b-dev.safetensors
+GEMMA_ROOT = /home/smiti-user/LTX-2/models/gemma-3-12b-it-qat-q4_0-unquantized
+DISTILLED_LORA = /home/smiti-user/LTX-2/models/ltx-2.3-22b-distilled-lora-384.safetensors
+SPATIAL_UPSAMPLER = /home/smiti-user/LTX-2/models/ltx-2.3-spatial-upscaler-x2-1.0.safetensors
+BENCHMARK_PIPELINE = one_stage
+BENCHMARK_PROFILE = fal
+EFFECTIVE_PIPELINE = one_stage
+RESOLUTION_SNAP = 32
+PYTHON_MODULE = ltx_pipelines.ti2vid_one_stage
+SEEDS = 42
+PROMPT_INDEX = 0
+NUM_INFERENCE_STEPS = 30
+
+[RUN] skye_chase_crosswalk_safety (seed=42) -> /home/smiti-user/LTX-2/output/benchmark_v1_fal/skye_chase_crosswalk_safety_1stage_p0_10s_1920x1088.mp4
+[RUN] skye_chase_crosswalk_safety (seed=42) -> /home/smiti-user/LTX-2/output/benchmark_v1_fal/skye_chase_crosswalk_safety_1stage_p0_10s_1920x1088.mp4
+/usr/lib/python3.10/runpy.py:126: RuntimeWarning: 'ltx_pipelines.ti2vid_one_stage' found in sys.modules after import of package 'ltx_pipelines', but prior to execution of 'ltx_pipelines.ti2vid_one_stage'; this may result in unpredictable behaviour
+  warn(RuntimeWarning(msg))
+Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
+  0%|          | 0/30 [00:00<?, ?it/s]  3%|▎         | 1/30 [00:53<26:02, 53.86s/it]  7%|▋         | 2/30 [01:47<25:07, 53.85s/it]

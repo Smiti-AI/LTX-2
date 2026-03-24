@@ -14,7 +14,7 @@ from ltx_core.components.protocols import DiffusionStepProtocol
 from ltx_core.components.schedulers import LTX2Scheduler
 from ltx_core.loader import LoraPathStrengthAndSDOps
 from ltx_core.model.audio_vae import decode_audio as vae_decode_audio
-from ltx_core.model.video_vae import decode_video as vae_decode_video
+from ltx_core.model.video_vae import TilingConfig, decode_video as vae_decode_video, get_video_chunks_number
 from ltx_core.quantization import QuantizationPolicy
 from ltx_core.types import Audio, LatentState, VideoPixelShape
 from ltx_pipelines.utils import (
@@ -161,7 +161,13 @@ class TI2VidOneStagePipeline:
         del transformer
         cleanup_memory()
 
-        decoded_video = vae_decode_video(video_state.latent, self.model_ledger.video_decoder(), generator=generator)
+        tiling_config = TilingConfig.default()
+        decoded_video = vae_decode_video(
+            video_state.latent,
+            self.model_ledger.video_decoder(),
+            tiling_config,
+            generator=generator,
+        )
         decoded_audio = vae_decode_audio(
             audio_state.latent, self.model_ledger.audio_decoder(), self.model_ledger.vocoder()
         )
@@ -181,6 +187,8 @@ def main() -> None:
         loras=tuple(args.lora) if args.lora else (),
         quantization=args.quantization,
     )
+    tiling_config = TilingConfig.default()
+    video_chunks_number = get_video_chunks_number(args.num_frames, tiling_config)
     video, audio = pipeline(
         prompt=args.prompt,
         negative_prompt=args.negative_prompt,
@@ -214,7 +222,7 @@ def main() -> None:
         fps=args.frame_rate,
         audio=audio,
         output_path=args.output_path,
-        video_chunks_number=1,
+        video_chunks_number=video_chunks_number,
     )
 
 

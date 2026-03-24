@@ -6,12 +6,21 @@
 # - LTX-2.3 checkpoint (ltx-2.3-22b-dev.safetensors)
 # - Gemma 3 text encoder (from google/gemma-3-12b-it-qat-q4_0-unquantized)
 #
+# EXAMPLE: skye_and_chase_bench scene (Chase & Skye racing near Lookout Tower)
+#   cd /home/smiti-user/LTX-2 && \
+#   IMAGE_PATH="/home/smiti-user/LTX-2/input/scenes/skye_and_chase_bench/Gemini_Generated_Image_x6vk1nx6vk1nx6vk.png" \
+#   OUTPUT_BASE_NAME="skye_and_chase_bench" \
+#   WIDTH=480 HEIGHT=832 FRAME_RATE=24 DURATIONS="5" SEED=42 \
+#   PROMPT='High-quality 3D animation in the style of Paw Patrol, vibrant colors, clean CGI, cinematic lighting, bright and cheerful atmosphere, smooth character animation, Nick Jr aesthetic, 4k render, detailed textures, expressive facial expressions. High-end 3D animation in the PAW Patrol style. The camera is framed in a wide shot near the Lookout Tower, looking down a racing path. Scene: Chase is standing in his police gear on the ground. Skye is hovering just above him (for 2 seconds). Dialogue: Chase: "Okay Skye, the mission is to get to the Lookout as fast as possible. NO shortcuts!" Skye (already moving forward, ascending higher, her voice fading): "Did you say something? Because I am already halfway there!" Action: As Chase finishes his sentence, Skye activates her pink booster and blasts forward. Chase looks up, his head following her ascent, with a stunned, wide-eyed expression of disbelief. The camera pans up with Skye flight path, leaving Chase in the distance, then cuts back to a funny close-up of Chase confused face. Cinematic lighting, fast-paced energy static camera composition maintained for the entire clip' \
+#   NEGATIVE_PROMPT="blurry, low quality, distorted" \
+#   ./run_skye_video.sh
+#
 # Configurable (set before running or edit defaults; run_all_skye_experiments.sh exports these):
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CHECKPOINT="${CHECKPOINT:-$SCRIPT_DIR/models/ltx-2.3-22b-dev.safetensors}"
 GEMMA_ROOT="${GEMMA_ROOT:-$SCRIPT_DIR/models/gemma-3-12b-it-qat-q4_0-unquantized}"
 LORA_PATH="${LORA_PATH:-}"
-IMAGE_PATH="${IMAGE_PATH:-$SCRIPT_DIR/input/sky_in_heli.jpg}"
+IMAGE_PATH="${IMAGE_PATH:-$SCRIPT_DIR/input/scenes/skye_in_hlicopter/sky_in_heli.jpg}"
 
 # Output naming (MOVA-style)
 OUTPUT_DIR="${OUTPUT_DIR:-$SCRIPT_DIR}"
@@ -129,6 +138,8 @@ NEGATIVE_PROMPT_TYPE_1="blurry, overexposed, static, low quality, distorted, ugl
 NEGATIVE_PROMPT_TYPE_2="scene change, shot change, jump cut, camera switch, camera movement, zoom, pan, rotation, changing angle, changing perspective, multiple scenes, montage, cinematic cuts, dynamic camera, blurry, low quality, compression artifacts, distorted face, deformed body, extra limbs, extra fingers"
 
 # Select prompt and negative prompt by PROMPT_TYPE (1, 2, or 3)
+# If PROMPT is already set in environment, use it (e.g. when running for a specific scene)
+if [ -z "${PROMPT}" ]; then
 if [ "${PROMPT_TYPE}" = "1" ]; then
   PROMPT="$PROMPT_TYPE_1"
   NEGATIVE_PROMPT="${NEGATIVE_PROMPT:-$NEGATIVE_PROMPT_TYPE_1}"
@@ -142,6 +153,7 @@ else
   # Default: PROMPT_TYPE 1 (allow NEGATIVE_PROMPT override)
   PROMPT="$PROMPT_TYPE_1"
   NEGATIVE_PROMPT="${NEGATIVE_PROMPT:-$NEGATIVE_PROMPT_TYPE_1}"
+fi
 fi
 
 # Option A: ltx-trainer inference (simpler - only needs checkpoint + Gemma)
@@ -210,3 +222,5 @@ else
     run_one "$NUM_FRAMES" "$OUTPUT" || exit 1
   done
 fi
+
+
