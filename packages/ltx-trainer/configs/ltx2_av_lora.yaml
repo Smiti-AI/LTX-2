@@ -26,11 +26,11 @@
 model:
   # Path to the LTX-2 model checkpoint (.safetensors file)
   # This should be a local path to your downloaded model
-  model_path: "path/to/ltx-2-model.safetensors"
+  model_path: "/home/smiti-user/LTX-2/models/ltx-2.3-22b-dev.safetensors"
 
   # Path to the text encoder model directory
   # For LTX-2, this is typically the Gemma-based text encoder
-  text_encoder_path: "path/to/gemma-text-encoder"
+  text_encoder_path: "/home/smiti-user/LTX-2/models/gemma-3-12b-it-qat-q4_0-unquantized"
 
   # Training mode: "lora" for efficient adapter training, "full" for full fine-tuning
   # LoRA is recommended for most use cases (faster, less memory, prevents overfitting)
@@ -163,8 +163,9 @@ acceleration:
   quantization: null
 
   # Load text encoder in 8-bit precision to save memory
-  # Useful when GPU memory is limited
-  load_text_encoder_in_8bit: false
+  # Strongly recommended: full Gemma on GPU can OOM during validation prompt encoding
+  # (especially with long prompts) before the main model is even loaded.
+  load_text_encoder_in_8bit: true
 
 # -----------------------------------------------------------------------------
 # Data Configuration
@@ -173,7 +174,7 @@ acceleration:
 data:
   # Root directory containing preprocessed training data
   # Should contain: latents/, conditions/, and optionally audio_latents/
-  preprocessed_data_root: "/path/to/preprocessed/data"
+  preprocessed_data_root: "/home/smiti-user/data/golden_skye_train"
 
   # Number of worker processes for data loading
   # Used for parallel data loading to speed up data loading
@@ -285,9 +286,11 @@ hub:
 # Weights & Biases Configuration
 # -----------------------------------------------------------------------------
 # Settings for experiment tracking with W&B.
+# Set enabled: true and run `wandb login` once (or set WANDB_API_KEY) to see
+# train/loss, learning rate, and validation_samples in the W&B UI.
 wandb:
   # Enable W&B logging
-  enabled: false
+  enabled: true
 
   # W&B project name
   project: "ltx-2-trainer"
