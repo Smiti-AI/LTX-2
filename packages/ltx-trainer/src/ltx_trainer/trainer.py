@@ -235,7 +235,6 @@ class LtxvTrainer:
                                 "train/loss": loss.item(),
                                 "train/learning_rate": current_lr,
                                 "train/step_time": step_time,
-                                "train/global_step": self._global_step,
                             }
                         )
 
@@ -983,9 +982,15 @@ class LtxvTrainer:
         self._wandb_run = run
 
     def _log_metrics(self, metrics: dict[str, float]) -> None:
-        """Log metrics to Weights & Biases."""
+        """Log metrics to Weights & Biases.
+
+        Uses ``step=self._global_step`` so training curves share the same x-axis as
+        ``validation_samples`` (which already passes ``step=``). Without this, W&B
+        uses an internal counter and loss/LR charts can be missing or misaligned in
+        the default workspace.
+        """
         if self._wandb_run is not None:
-            self._wandb_run.log(metrics)
+            self._wandb_run.log(metrics, step=self._global_step)
 
     def _log_validation_samples(self, sample_paths: list[Path], prompts: list[str]) -> None:
         """Log validation samples (videos or images) to Weights & Biases."""
