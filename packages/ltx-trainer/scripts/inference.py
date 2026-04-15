@@ -429,7 +429,6 @@ def main() -> None:  # noqa: PLR0912, PLR0915
             audio_decoder=components.audio_vae_decoder if generate_audio else None,
             vocoder=components.vocoder if generate_audio else None,
             sampling_context=progress,
-            embeddings_processor=embeddings_processor,
         )
         video, audio = sampler.generate(
             config=gen_config,
