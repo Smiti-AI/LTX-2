@@ -75,7 +75,7 @@ validation:
 
 checkpoints:
   interval: 250
-  keep_last_n: 3
+  keep_last_n: 0  # 0 = keep all checkpoints — needed to benchmark full training curve
   precision: "bfloat16"
 
 flow_matching:
