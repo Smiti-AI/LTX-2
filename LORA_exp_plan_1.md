@@ -376,3 +376,50 @@ ssh efrattaig@35.238.2.51 "tail -f /tmp/ltx_current.log"
 uv run python run_skye_like_api.py \
   --lora /home/efrattaig/LTX-2/outputs/skye_exp2_standard/checkpoint-2500/pytorch_lora_weights.safetensors
 ```
+
+---
+
+## Action Items
+
+> Preprocessing is done — 106/111 clips ready (5 skipped, too short to crop to 2s — normal).
+
+### Ready to launch now
+
+- [ ] **Launch EXP-1 on Machine 1**
+  ```bash
+  ssh efrattaig@35.238.2.51 "cd /home/efrattaig/LTX-2 && git pull && \
+    nohup /home/efrattaig/.local/bin/uv run python packages/ltx-trainer/scripts/train.py \
+    packages/ltx-trainer/configs/skye_exp1_baseline.yaml \
+    2>&1 | tee /tmp/ltx_current.log &"
+  ```
+
+- [ ] **Launch EXP-4 on Machine 2** in parallel with EXP-1 (copy preprocessed data, then same command with `skye_exp4_i2v.yaml`)
+
+### Your task — create start frame images
+
+- [ ] Make **3 more start frame images** for validation:
+  1. Skye flying outdoors with helicopter backpack
+  2. Skye close-up / portrait looking at camera
+  3. Skye at the Lookout tower
+  - Save locally to `inputs/`, then `scp` to server `/home/efrattaig/data/start_frames/`
+  - Once they exist, add them to the `images:` field in each experiment config
+
+### During EXP-1 (~2 hrs in)
+
+- [ ] **Check W&B at step 500** — is Skye's pink coloring and cockpit visible?
+  - Yes → launch EXP-2 immediately (don't wait for EXP-1 to finish)
+  - No → investigate captions and audio latents
+
+### After EXP-1 step 500 — launch main experiment
+
+- [ ] **Launch EXP-2 on Machine 1** (5000 steps, primary run)
+
+### At training milestones
+
+- [ ] **HQ eval — EXP-2 checkpoint-1000** → `run_skye_like_api.py --lora checkpoint-1000`
+- [ ] **HQ eval — EXP-2 checkpoint-2500** → compare to baseline
+- [ ] **HQ eval — EXP-2 checkpoint-5000** → decide: done or extend to 10k steps
+
+### If EXP-2 step 2500 looks underfitting
+
+- [ ] Launch **EXP-3** (attention + FFN layers, contingency only)
