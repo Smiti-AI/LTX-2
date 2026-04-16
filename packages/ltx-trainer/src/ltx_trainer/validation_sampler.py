@@ -776,10 +776,10 @@ class ValidationSampler:
         decoded_audio = self._audio_decoder(latent)
         self._audio_decoder.to("cpu")
 
-        # Vocoder internally calls mel_spec.float(); cast model to float32 so dtypes match.
+        # Vocoder internally calls mel_spec.float(); cast both model and input to float32 so dtypes match.
         # (torch.autocast with dtype=float32 is a no-op on CPU, leaving weights in bfloat16.)
         self._vocoder.to(cpu_device).float()
-        audio_waveform = self._vocoder(decoded_audio)
+        audio_waveform = self._vocoder(decoded_audio.float())
         self._vocoder.to("cpu")
 
         return audio_waveform.squeeze(0).float().cpu()
