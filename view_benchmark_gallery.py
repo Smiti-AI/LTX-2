@@ -27,13 +27,21 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 BENCHMARKS_DIR = SCRIPT_DIR / "output" / "benchmarks"
 OUTPUT_HTML = BENCHMARKS_DIR / "index.html"
 
-SCENE_ORDER = ["bey", "crsms", "holoween", "party", "snow"]
+SCENE_ORDER = [
+    "bey", "crsms", "holoween", "party", "snow",
+    "of_silly_goose", "of_eagle", "of_lifeguard", "of_lift", "of_everest",
+]
 SCENE_LABELS = {
-    "bey":      "Lookout (sunny)",
-    "crsms":    "Christmas",
-    "holoween": "Halloween",
-    "party":    "Party",
-    "snow":     "Snowy lookout",
+    "bey":           "Lookout (sunny)",
+    "crsms":         "Christmas",
+    "holoween":      "Halloween",
+    "party":         "Party",
+    "snow":          "Snowy lookout",
+    "of_silly_goose": "🔬 Silly goose",
+    "of_eagle":       "🔬 Eagle warning",
+    "of_lifeguard":   "🔬 Lifeguard",
+    "of_lift":        "🔬 Lift/harness",
+    "of_everest":     "🔬 Everest visit",
 }
 
 

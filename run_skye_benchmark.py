@@ -59,6 +59,9 @@ BM_LORA_S1     = 0.25
 BM_LORA_S2     = 0.50
 BM_ENHANCE_PROMPT = True   # use Gemma prompt enhancer built into the pipeline
 
+# Where the 5 overfit test frames live (extracted from training clips)
+OVERFIT_IMAGES_DIR = SCRIPT_DIR / "inputs" / "overfit_bm"
+
 # ══════════════════════════════════════════════════════════════════════════════
 #  SHARED DIALOGUE — appended to every scene prompt
 # ══════════════════════════════════════════════════════════════════════════════
@@ -151,6 +154,83 @@ BENCHMARK_SCENES = [
             + _DIALOGUE
         ),
     },
+    # ── Overfitting test scenes ───────────────────────────────────────────────
+    # These use exact training captions + the birthday dialogue.
+    # If the LoRA has overfit, it should reproduce the motion it was trained on.
+    # enhance_prompt=False so Gemma doesn't alter the training text.
+    {
+        "name": "of_silly_goose",
+        "image": OVERFIT_IMAGES_DIR / "scene_41_episode_1_scene_segment_41.png",
+        "enhance_prompt": False,
+        "prompt": (
+            'SKYE says "Where are you going, silly goose?". '
+            "A fixed medium close-up shot frames Skye, a golden-brown pup, as she faces the camera. "
+            "At the start, her eyes are almost closed, conveying a mischievous, slightly smug expression, "
+            "with her perked ears framing her face. Her purple irises are barely visible beneath her heavy "
+            "eyelids. Her head remains perfectly still as her eyes slowly open, revealing her full, bright "
+            "purple irises, and her facial expression transforms into an alert, playful look, accompanied "
+            "by a small, closed-mouth smile. Her gaze remains fixed on the camera throughout this subtle shift."
+            + _DIALOGUE
+        ),
+    },
+    {
+        "name": "of_eagle",
+        "image": OVERFIT_IMAGES_DIR / "scene_66_episode_2_scene_segment_66.png",
+        "enhance_prompt": False,
+        "prompt": (
+            'SKYE says "That eagle can be dangerous to small flying creatures like Chickaletta and me!". '
+            "The camera holds a fixed medium close-up on Skye, her face etched with a worried expression. "
+            "Her wide, purple eyes dart slightly, initially looking to the right of the camera, then shifting "
+            "upwards and further to the right, conveying deep concern. Her mouth is slightly agape, revealing "
+            "her teeth as she speaks with trepidation, while her ears are slightly lowered, emphasizing her distress."
+            + _DIALOGUE
+        ),
+    },
+    {
+        "name": "of_lifeguard",
+        "image": OVERFIT_IMAGES_DIR / "scene_58_episode_1_scene_segment_58.png",
+        "enhance_prompt": False,
+        "prompt": (
+            'SKYE says "You can\'t be a lifeguard without getting wet, Rocky.". '
+            "A fixed medium close-up shot captures Skye, the tan and white Cockapoo, wearing her signature "
+            "pink aviator visor and gear. Initially, her wide, purple eyes gaze slightly upwards and to the "
+            "right with a thoughtful, concerned expression. Her head then subtly tilts downwards as her eyes "
+            "close, and her mouth opens wide in a sigh of exasperation. Suddenly, her head lifts, and her eyes "
+            "snap open, widening dramatically, while her mouth forms a surprised 'O' shape, as she looks "
+            "directly forward, facing the camera with an expression of shock."
+            + _DIALOGUE
+        ),
+    },
+    {
+        "name": "of_lift",
+        "image": OVERFIT_IMAGES_DIR / "scene_189_episode_1_scene_segment_189.png",
+        "enhance_prompt": False,
+        "prompt": (
+            'SKYE says "Did someone call for a lift?  Harness!". '
+            "The camera maintains a fixed medium shot on Skye, the cockapoo, seated in her pink helicopter. "
+            "Initially, she faces the camera with a wide, open-mouthed smile, her bright eyes sparkling behind "
+            "pink goggles, and her head tilted slightly, conveying a cheerful and energetic demeanor. As the "
+            "moment unfolds, her expression subtly transforms; her smile softens into a slight frown, and her "
+            "eyes slowly close, her ears drooping slightly, transitioning her cheerful disposition to one of "
+            "gentle weariness or sadness."
+            + _DIALOGUE
+        ),
+    },
+    {
+        "name": "of_everest",
+        "image": OVERFIT_IMAGES_DIR / "scene_27_episode_1_scene_segment_27.png",
+        "enhance_prompt": False,
+        "prompt": (
+            'SKYE says "It\'s gonna be so much fun visiting Everest and Captain Turban!". '
+            "A fixed medium shot centers on Skye, the golden-brown cockapoo, sitting upright on a teal surface. "
+            "She faces the camera with wide, bright pink eyes and an enthusiastic, open-mouthed smile, her head "
+            "slightly tilted as she speaks, conveying excitement. Her pink collar and badge are visible, and her "
+            "ears are perked. As she continues to speak, her eyes briefly close and reopen, maintaining her "
+            "cheerful demeanor. Finally, her eyes close again, and her smile softens into a peaceful, contented "
+            "expression, her head remaining still, as if savoring a pleasant thought."
+            + _DIALOGUE
+        ),
+    },
 ]
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -227,6 +307,8 @@ def generate_one(pipeline, *, scene, num_frames, video_guider_params,
 
     negative_prompt = DEFAULT_NEGATIVE_PROMPT
 
+    enhance = scene.get("enhance_prompt", BM_ENHANCE_PROMPT)
+
     video, audio = pipeline(
         prompt=scene["prompt"],
         negative_prompt=negative_prompt,
@@ -240,7 +322,7 @@ def generate_one(pipeline, *, scene, num_frames, video_guider_params,
         audio_guider_params=audio_guider_params,
         images=[ImageConditioningInput(path=str(scene["image"]), frame_idx=0, strength=1.0)],
         tiling_config=tiling_config,
-        enhance_prompt=BM_ENHANCE_PROMPT,
+        enhance_prompt=enhance,
     )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -271,7 +353,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--scenes", nargs="+", default=None,
-        choices=[s["name"] for s in BENCHMARK_SCENES],
+        choices=[s["name"] for s in BENCHMARK_SCENES] + ["overfit"],
         help="Run only these scene(s). Default: all.",
     )
     parser.add_argument(
@@ -296,10 +378,13 @@ def main() -> int:
         print("No experiment dirs found.", file=sys.stderr)
         return 1
 
-    # Filter scenes
+    # Filter scenes  ("overfit" is a shorthand for all of_ scenes)
     scenes = BENCHMARK_SCENES
     if args.scenes:
         names = set(args.scenes)
+        if "overfit" in names:
+            names.discard("overfit")
+            names |= {s["name"] for s in BENCHMARK_SCENES if s["name"].startswith("of_")}
         scenes = [s for s in BENCHMARK_SCENES if s["name"] in names]
 
     # Validate benchmark images exist
