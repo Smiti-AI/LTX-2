@@ -237,6 +237,9 @@ BENCHMARK_SCENES = [
 #  Nothing below here should need editing
 # ══════════════════════════════════════════════════════════════════════════════
 
+import gc
+import subprocess
+
 log = logging.getLogger(__name__)
 
 
@@ -261,43 +264,76 @@ def discover_checkpoints(exp_dirs: list[Path]) -> list[tuple[str, int, Path]]:
     return results
 
 
-def output_path_for(base_dir: Path, exp_name: str, step: int, scene_name: str) -> Path:
-    return base_dir / "benchmarks" / exp_name / f"step_{step:05d}" / f"{scene_name}.mp4"
+# ── Output paths ─────────────────────────────────────────────────────────────
+# base video:        benchmarks/_base/{scene}.mp4          (generated once, reused)
+# lora video:        benchmarks/{exp}/step_{N}/{scene}_lora.mp4
+# comparison video:  benchmarks/{exp}/step_{N}/{scene}.mp4  ← what the gallery shows
+
+def base_path_for(output_dir: Path, scene_name: str) -> Path:
+    return output_dir / "benchmarks" / "_base" / f"{scene_name}.mp4"
+
+def lora_path_for(output_dir: Path, exp_name: str, step: int, scene_name: str) -> Path:
+    return output_dir / "benchmarks" / exp_name / f"step_{step:05d}" / f"{scene_name}_lora.mp4"
+
+def comparison_path_for(output_dir: Path, exp_name: str, step: int, scene_name: str) -> Path:
+    return output_dir / "benchmarks" / exp_name / f"step_{step:05d}" / f"{scene_name}.mp4"
 
 
-def build_pipeline(lora_path: Path):
-    import torch
-    torch.backends.cudnn.enabled = False
+# ── Pipeline builders ─────────────────────────────────────────────────────────
 
+def _distilled_lora():
     from ltx_core.loader import LTXV_LORA_COMFY_RENAMING_MAP, LoraPathStrengthAndSDOps
-    from ltx_pipelines.ti2vid_two_stages_hq import TI2VidTwoStagesHQPipeline
-
-    skye_loras = (LoraPathStrengthAndSDOps(
-        path=str(lora_path),
-        strength=1.0,
-        sd_ops=None,
-    ),)
-    distilled_lora = [LoraPathStrengthAndSDOps(
+    return [LoraPathStrengthAndSDOps(
         path=str(DISTILLED_LORA),
         strength=1.0,
         sd_ops=LTXV_LORA_COMFY_RENAMING_MAP,
     )]
+
+def build_pipeline_base():
+    """Base LTX-2.3 model — no Skye LoRA."""
+    import torch
+    torch.backends.cudnn.enabled = False
+    from ltx_pipelines.ti2vid_two_stages_hq import TI2VidTwoStagesHQPipeline
     return TI2VidTwoStagesHQPipeline(
         checkpoint_path=str(CHECKPOINT),
-        distilled_lora=distilled_lora,
+        distilled_lora=_distilled_lora(),
         distilled_lora_strength_stage_1=BM_LORA_S1,
         distilled_lora_strength_stage_2=BM_LORA_S2,
         spatial_upsampler_path=str(SPATIAL_UPSAMPLER),
         gemma_root=str(GEMMA_ROOT),
-        loras=skye_loras,
+        loras=(),
     )
 
+def build_pipeline_lora(lora_path: Path):
+    """Base model + Skye LoRA checkpoint."""
+    import torch
+    torch.backends.cudnn.enabled = False
+    from ltx_core.loader import LoraPathStrengthAndSDOps
+    from ltx_pipelines.ti2vid_two_stages_hq import TI2VidTwoStagesHQPipeline
+    return TI2VidTwoStagesHQPipeline(
+        checkpoint_path=str(CHECKPOINT),
+        distilled_lora=_distilled_lora(),
+        distilled_lora_strength_stage_1=BM_LORA_S1,
+        distilled_lora_strength_stage_2=BM_LORA_S2,
+        spatial_upsampler_path=str(SPATIAL_UPSAMPLER),
+        gemma_root=str(GEMMA_ROOT),
+        loras=(LoraPathStrengthAndSDOps(path=str(lora_path), strength=1.0, sd_ops=None),),
+    )
+
+def unload_pipeline(pipeline) -> None:
+    """Free GPU memory after a pipeline is no longer needed."""
+    import torch
+    del pipeline
+    gc.collect()
+    torch.cuda.empty_cache()
+
+
+# ── Generation ────────────────────────────────────────────────────────────────
 
 def generate_one(pipeline, *, scene, num_frames, video_guider_params,
                  audio_guider_params, output_path) -> None:
     import torch
     from ltx_core.model.video_vae import TilingConfig, get_video_chunks_number
-    from ltx_core.types import Audio
     from ltx_pipelines.utils.args import ImageConditioningInput
     from ltx_pipelines.utils.media_io import encode_video
     from ltx_pipelines.utils.constants import DEFAULT_NEGATIVE_PROMPT
@@ -310,8 +346,6 @@ def generate_one(pipeline, *, scene, num_frames, video_guider_params,
         + ", waving paw, raised paw, paw in the air, arm raised, hand gesture, "
         "waving hand, pointing, gesturing, paw movement, arm movement"
     )
-
-    enhance = scene.get("enhance_prompt", BM_ENHANCE_PROMPT)
 
     video, audio = pipeline(
         prompt=scene["prompt"],
@@ -326,7 +360,7 @@ def generate_one(pipeline, *, scene, num_frames, video_guider_params,
         audio_guider_params=audio_guider_params,
         images=[ImageConditioningInput(path=str(scene["image"]), frame_idx=0, strength=1.0)],
         tiling_config=tiling_config,
-        enhance_prompt=enhance,
+        enhance_prompt=scene.get("enhance_prompt", BM_ENHANCE_PROMPT),
     )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -340,11 +374,55 @@ def generate_one(pipeline, *, scene, num_frames, video_guider_params,
         )
 
 
+# ── Concatenation ─────────────────────────────────────────────────────────────
+
+def concat_comparison(base_path: Path, lora_path: Path, out_path: Path,
+                      lora_label: str) -> None:
+    """Concatenate base + lora videos with title overlays using ffmpeg."""
+    # Escape characters that ffmpeg's drawtext treats as special
+    def esc(s: str) -> str:
+        return s.replace("'", "\\'").replace(":", "\\:")
+
+    base_label_esc = esc("Base LTX-2.3")
+    lora_label_esc = esc(lora_label)
+
+    font_size = 36
+    box = "box=1:boxcolor=black@0.55:boxborderw=12"
+
+    filter_complex = (
+        f"[0:v]drawtext=text='{base_label_esc}':fontsize={font_size}:fontcolor=white"
+        f":x=20:y=20:{box}[v0];"
+        f"[1:v]drawtext=text='{lora_label_esc}':fontsize={font_size}:fontcolor=yellow"
+        f":x=20:y=20:{box}[v1];"
+        f"[v0][0:a][v1][1:a]concat=n=2:v=1:a=1[outv][outa]"
+    )
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    result = subprocess.run(
+        [
+            "ffmpeg", "-y",
+            "-i", str(base_path),
+            "-i", str(lora_path),
+            "-filter_complex", filter_complex,
+            "-map", "[outv]", "-map", "[outa]",
+            "-c:v", "libx264", "-crf", "18",
+            "-c:a", "aac", "-b:a", "192k",
+            str(out_path),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"ffmpeg concat failed:\n{result.stderr[-2000:]}")
+
+
+# ── Main ──────────────────────────────────────────────────────────────────────
+
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
     parser = argparse.ArgumentParser(
-        description="run_skye_benchmark — evaluate every LoRA checkpoint on all benchmark scenes",
+        description="run_skye_benchmark — base vs LoRA comparison for every checkpoint",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
@@ -362,11 +440,11 @@ def main() -> int:
     )
     parser.add_argument(
         "--dry-run", action="store_true",
-        help="Print what would be generated without actually running.",
+        help="Print plan without generating anything.",
     )
     args = parser.parse_args()
 
-    # Resolve experiment dirs
+    # ── Resolve experiment dirs ───────────────────────────────────────────────
     if args.exp_dirs:
         exp_dirs = [d.resolve() for d in args.exp_dirs]
     else:
@@ -377,12 +455,11 @@ def main() -> int:
             d for d in DEFAULT_OUTPUTS_BASE.iterdir()
             if d.is_dir() and d.name.startswith("skye_")
         )
-
     if not exp_dirs:
         print("No experiment dirs found.", file=sys.stderr)
         return 1
 
-    # Filter scenes  ("overfit" is a shorthand for all of_ scenes)
+    # ── Filter scenes ─────────────────────────────────────────────────────────
     scenes = BENCHMARK_SCENES
     if args.scenes:
         names = set(args.scenes)
@@ -391,74 +468,87 @@ def main() -> int:
             names |= {s["name"] for s in BENCHMARK_SCENES if s["name"].startswith("of_")}
         scenes = [s for s in BENCHMARK_SCENES if s["name"] in names]
 
-    # Validate benchmark images exist
+    # ── Validate images ───────────────────────────────────────────────────────
     missing_images = [s["image"] for s in scenes if not s["image"].exists()]
     if missing_images:
         for p in missing_images:
             print(f"ERROR: benchmark image not found: {p}", file=sys.stderr)
-        print("  → scp them to the server:  scp -r 'inputs/sky bm/' server:~/projects/LTX-2/inputs/sky_bm/",
-              file=sys.stderr)
         return 1
 
-    # Validate model weights
+    # ── Validate weights ──────────────────────────────────────────────────────
     if not args.dry_run:
-        missing = [p for p in (CHECKPOINT, DISTILLED_LORA, SPATIAL_UPSAMPLER, GEMMA_ROOT) if not p.exists()]
+        missing = [p for p in (CHECKPOINT, DISTILLED_LORA, SPATIAL_UPSAMPLER, GEMMA_ROOT)
+                   if not p.exists()]
         if missing:
             for m in missing:
                 print(f"ERROR: weight not found: {m}", file=sys.stderr)
             return 1
 
-    # Discover checkpoints
+    # ── Discover checkpoints ──────────────────────────────────────────────────
     checkpoints = discover_checkpoints(exp_dirs)
     if not checkpoints:
         print("No checkpoints found in any experiment dir yet.")
         return 0
 
-    # Build work list — skip already-done
-    work = []
+    # ── Build work lists ──────────────────────────────────────────────────────
+    # base_needed:   scenes where base video doesn't exist yet
+    # lora_work:     (exp, step, ckpt, scene) where comparison doesn't exist yet
+    base_needed = [
+        (scene, base_path_for(args.output_dir, scene["name"]))
+        for scene in scenes
+        if not base_path_for(args.output_dir, scene["name"]).exists()
+    ]
+    # Deduplicate (same scene can appear multiple times across checkpoints)
+    seen_scenes = set()
+    base_needed_dedup = []
+    for scene, p in base_needed:
+        if scene["name"] not in seen_scenes:
+            base_needed_dedup.append((scene, p))
+            seen_scenes.add(scene["name"])
+    base_needed = base_needed_dedup
+
+    lora_work = []
     skip_count = 0
     for exp_name, step, ckpt_path in checkpoints:
         for scene in scenes:
-            out = output_path_for(args.output_dir, exp_name, step, scene["name"])
-            if out.exists():
+            comp = comparison_path_for(args.output_dir, exp_name, step, scene["name"])
+            if comp.exists():
                 skip_count += 1
             else:
-                work.append((exp_name, step, ckpt_path, scene, out))
+                lora_out = lora_path_for(args.output_dir, exp_name, step, scene["name"])
+                lora_work.append((exp_name, step, ckpt_path, scene, lora_out, comp))
 
-    total = len(work) + skip_count
+    total = len(lora_work) + skip_count
     print(f"\nrun_skye_benchmark")
-    print(f"  checkpoints : {len(checkpoints)}")
-    print(f"  scenes      : {[s['name'] for s in scenes]}")
-    print(f"  total jobs  : {total}  ({skip_count} already done, {len(work)} to run)")
+    print(f"  checkpoints  : {len(checkpoints)}")
+    print(f"  scenes       : {[s['name'] for s in scenes]}")
+    print(f"  base videos  : {len(base_needed)} to generate  "
+          f"({len(scenes) - len(base_needed)} already done)")
+    print(f"  comparisons  : {total} total  ({skip_count} already done, {len(lora_work)} to run)")
     print()
 
-    if not work:
+    if not base_needed and not lora_work:
         print("Nothing to do — all outputs already exist.")
         return 0
 
     if args.dry_run:
-        for exp_name, step, ckpt_path, scene, out in work:
-            print(f"  WOULD RUN  {exp_name}  step={step:05d}  scene={scene['name']}")
-            print(f"             → {out}")
+        for scene, p in base_needed:
+            print(f"  WOULD GEN BASE  scene={scene['name']}")
+            print(f"                  → {p}")
+        for exp_name, step, _, scene, lora_out, comp in lora_work:
+            print(f"  WOULD GEN LORA  {exp_name}  step={step:05d}  scene={scene['name']}")
+            print(f"                  → {comp}")
         return 0
 
     from ltx_core.components.guiders import MultiModalGuiderParams
 
     video_guider_params = MultiModalGuiderParams(
-        cfg_scale=BM_VIDEO_CFG,
-        stg_scale=0.0,
-        rescale_scale=0.45,
-        modality_scale=3.0,
-        skip_step=0,
-        stg_blocks=[],
+        cfg_scale=BM_VIDEO_CFG, stg_scale=0.0, rescale_scale=0.45,
+        modality_scale=3.0, skip_step=0, stg_blocks=[],
     )
     audio_guider_params = MultiModalGuiderParams(
-        cfg_scale=BM_AUDIO_CFG,
-        stg_scale=0.0,
-        rescale_scale=1.0,
-        modality_scale=3.0,
-        skip_step=0,
-        stg_blocks=[],
+        cfg_scale=BM_AUDIO_CFG, stg_scale=0.0, rescale_scale=1.0,
+        modality_scale=3.0, skip_step=0, stg_blocks=[],
     )
 
     num_frames = frames_for_duration(BM_DURATION_S, BM_FPS)
@@ -467,37 +557,76 @@ def main() -> int:
     print(f"  resolution  : {BM_WIDTH}×{BM_HEIGHT}  |  steps={BM_STEPS}  seed={BM_SEED}")
     print()
 
+    gen_kwargs = dict(num_frames=num_frames, video_guider_params=video_guider_params,
+                      audio_guider_params=audio_guider_params)
     errors = 0
-    current_ckpt = None
-    pipeline = None
 
-    for exp_name, step, ckpt_path, scene, out in work:
-        # Load a new pipeline only when the checkpoint changes
+    # ── PASS 1: Base model — generate all missing base videos ─────────────────
+    if base_needed:
+        print("── Loading BASE pipeline ──")
+        base_pipeline = build_pipeline_base()
+        print()
+        for scene, base_out in base_needed:
+            print(f"  [BASE] {scene['name']:20s} → {base_out.name}")
+            try:
+                generate_one(base_pipeline, scene=scene, output_path=base_out, **gen_kwargs)
+                print(f"    saved ✓")
+            except Exception:
+                log.exception("Base generation failed: %s", scene["name"])
+                errors += 1
+            print()
+        print("── Unloading BASE pipeline ──\n")
+        unload_pipeline(base_pipeline)
+
+    # ── PASS 2: LoRA model — generate + concatenate ───────────────────────────
+    current_ckpt = None
+    lora_pipeline = None
+
+    for exp_name, step, ckpt_path, scene, lora_out, comp_out in lora_work:
+        # Reload pipeline only when checkpoint changes
         if (exp_name, step) != current_ckpt:
-            print(f"── Loading checkpoint: {exp_name}  step={step:05d} ──")
+            if lora_pipeline is not None:
+                print(f"── Unloading {current_ckpt[0]} step {current_ckpt[1]:05d} ──\n")
+                unload_pipeline(lora_pipeline)
+            print(f"── Loading LoRA: {exp_name}  step={step:05d} ──")
             print(f"   {ckpt_path}")
-            pipeline = build_pipeline(ckpt_path)
+            lora_pipeline = build_pipeline_lora(ckpt_path)
             current_ckpt = (exp_name, step)
             print()
 
-        print(f"  Scene: {scene['name']:12s}  → {out.relative_to(args.output_dir)}")
-        try:
-            generate_one(
-                pipeline,
-                scene=scene,
-                num_frames=num_frames,
-                video_guider_params=video_guider_params,
-                audio_guider_params=audio_guider_params,
-                output_path=out,
-            )
-            print(f"    saved ✓")
-        except Exception:
-            log.exception("Generation failed: %s / step %d / %s", exp_name, step, scene["name"])
-            errors += 1
+        lora_label = f"LoRA: {exp_name.replace('skye_', '')}  step {step:,}"
+        print(f"  [LORA] {scene['name']:20s} → {lora_out.name}")
+
+        # Generate LoRA video (skip if already exists from a previous interrupted run)
+        if not lora_out.exists():
+            try:
+                generate_one(lora_pipeline, scene=scene, output_path=lora_out, **gen_kwargs)
+                print(f"    lora saved ✓")
+            except Exception:
+                log.exception("LoRA generation failed: %s / step %d / %s",
+                              exp_name, step, scene["name"])
+                errors += 1
+                print()
+                continue
+
+        # Concatenate base + lora → comparison
+        base_out = base_path_for(args.output_dir, scene["name"])
+        if base_out.exists():
+            try:
+                concat_comparison(base_out, lora_out, comp_out, lora_label)
+                print(f"    comparison saved ✓  ({comp_out.name})")
+            except Exception:
+                log.exception("Concat failed: %s / step %d / %s", exp_name, step, scene["name"])
+                errors += 1
+        else:
+            print(f"    WARNING: base video missing for {scene['name']} — skipping concat")
         print()
 
-    done = len(work) - errors
-    print(f"Done. {done}/{len(work)} generation(s) succeeded.")
+    if lora_pipeline is not None:
+        unload_pipeline(lora_pipeline)
+
+    done = len(lora_work) - errors
+    print(f"Done. {done}/{len(lora_work)} comparison(s) succeeded.")
     return 0 if errors == 0 else 1
 
 
