@@ -71,7 +71,8 @@ GEMMA_ROOT        = Path("/home/efrattaig/models/gemma-3-12b-it-qat-q4_0-unquant
 #  EDIT THESE — generation defaults (can also be overridden via CLI flags)
 # ══════════════════════════════════════════════════════════════════════════════
 
-DEFAULT_DURATIONS  = [10.0]   # seconds — passed as --durations to override
+DEFAULT_DURATIONS  = [15.0]   # seconds — passed as --durations to override
+DEFAULT_SEED       = 200                 # seed 200 produces no hand movement
 DEFAULT_FPS        = 25.0
 DEFAULT_WIDTH      = 768                 # stage-2 output; stage-1 uses half (384) — must be divisible by 64
 DEFAULT_HEIGHT     = 1024                # stage-2 output; stage-1 uses half (512) — must be divisible by 64
@@ -177,8 +178,8 @@ def main() -> int:
     )
     parser.add_argument("--durations", type=float, nargs="+", default=DEFAULT_DURATIONS,
                         help="Video length(s) in seconds.")
-    parser.add_argument("--seed", type=int, default=None,
-                        help="Random seed. Omit for random.")
+    parser.add_argument("--seed", type=int, default=DEFAULT_SEED,
+                        help="Random seed.")
     parser.add_argument("--no-audio", action="store_true",
                         help="Skip audio generation (faster, same video quality).")
     parser.add_argument("--video-cfg", type=float, default=DEFAULT_VIDEO_CFG,
@@ -230,7 +231,7 @@ def main() -> int:
 
     errors = 0
     for dur in args.durations:
-        seed = args.seed if args.seed is not None else random.randint(0, 2**31 - 1)
+        seed = args.seed
         nf = frames_for_duration(dur, DEFAULT_FPS)
         actual_dur = round(nf / DEFAULT_FPS, 2)
         out_name = (
