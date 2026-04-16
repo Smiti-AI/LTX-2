@@ -1,229 +1,258 @@
-# Skye LoRA — Experiment Plan
+# Skye LoRA — Full Training Plan
 
-**Goal:** Fine-tune LTX-2.3 on Skye (PAW Patrol) footage to generate character-faithful videos — appearance, movement, and voice — for producing custom birthday message videos.
+**The Goal:** Generate Skye (PAW Patrol) saying a custom birthday message in a character-faithful video — correct appearance, voice, and motion — from a reference start frame.
 
-**Server:** `35.238.2.51` · **Model:** `ltx-2.3-22b-dev.safetensors` (22B params) · **W&B:** [ltx-2-skye-lora project](https://wandb.ai/shayzweig-smiti-ai/ltx-2-skye-lora)
-
----
-
-## Are We Using the Official Lightricks Training Script?
-
-**Yes.** This is important context. The community tutorial (Ostress) used **AI Toolkit** — a general-purpose third-party training framework. We are using **`packages/ltx-trainer`**, which is the official Lightricks training repository built specifically for LTX-2/2.3. This means:
-
-- The configs, VRAM optimizations, audio-video joint training, and data pipeline are all purpose-built for this model
-- The official script correctly handles the 22B-specific `cross_attention_adaln` path (which AI Toolkit may not)
-- Results may differ from the tutorial because the training machinery is different
-
-The tutorial is still useful as a reference for **what "good" looks like at various step counts** and for understanding the data preparation philosophy — but it's not an apples-to-apples comparison.
+**W&B:** [ltx-2-skye-lora](https://wandb.ai/shayzweig-smiti-ai/ltx-2-skye-lora) · **Server:** `35.238.2.51`
 
 ---
 
-## What Are the 48 Transformer Blocks?
+## Which Scripts Are We Using?
 
-Think of the model as a 48-floor assembly line. Raw noise goes in at floor 1; a coherent video comes out at floor 48. Each floor (block) does one complete round of:
+**We use the official Lightricks training scripts from `packages/ltx-trainer/`.** Nothing custom was written for training logic. Here's exactly what runs what:
 
-1. **Video self-attention** — every frame checks every other frame: *"are we consistent with each other?"*
-2. **Video-text attention** — every frame checks the prompt: *"does what I look like match the description?"*
-3. **Audio self-attention** — audio segments check each other for temporal coherence
-4. **Audio-text attention** — audio checks the prompt: *"does what I sound like match the description?"*
-5. **Audio↔Video cross-attention** — video and audio synchronize with each other
-6. **Feed-forward processing** — each position independently processes what it learned from the above
+| Script | What it does | Source |
+|--------|-------------|--------|
+| `packages/ltx-trainer/scripts/train.py` | **Main training loop** | Official Lightricks |
+| `packages/ltx-trainer/scripts/process_dataset.py` | Encode all videos + audio + text into latents | Official Lightricks |
+| `packages/ltx-trainer/configs/skye_exp*.yaml` | Training parameters for each experiment | **Written by us**, based on official `ltx2_av_lora.yaml` |
+| `run_skye_like_api.py` | Full HQ inference for evaluation | Exists in repo, we added `--lora` flag |
 
-The first ~15 blocks establish global structure (is this even a dog? is there a helicopter?). The middle blocks (~15–35) build character identity, motion patterns, and voice character. The last blocks (~35–48) handle fine detail, facial expressions, and audio-visual sync.
+The community tutorial (Ostress) used AI Toolkit, which is a different third-party framework. We use the Lightricks-native trainer, which is purpose-built for LTX-2.3 and handles audio-video joint training correctly.
 
-LoRA is applied to the routing weights (Q, K, V, output) inside every attention module across all 48 blocks. We're teaching all 48 floors simultaneously to route attention differently when they see Skye-like content.
-
----
-
-## What We Learned from the Tutorial
-
-**Tutorial setup:**
-- 19 clips, ~4–8 seconds each (avg ~5s), single room/scene, one person
-- Rank 32, AI Toolkit framework
-- Timestep strategy: "high noise" for first 2000 steps → switch to "balanced"
-- Results:
-  - Step 29: "clearly not me" — nothing meaningful yet
-  - Step ~2000: "looking pretty good" — voice nailing it, background correct
-  - Step 5000: "That is me" — face, clothing, voice all locked in
-
-**The key metric: clip exposures.** At batch_size=1, each training step uses 1 clip. With 19 clips and 5000 steps, the model sees each clip ~**263 times** before converging.
-
-**What this means for our 409-clip dataset:**
-
-| Steps | Clip exposures per clip | Tutorial equivalent |
-|-------|------------------------|---------------------|
-| 1,000 | 2.4× | Tutorial step ~45 — too early to judge |
-| 2,500 | 6.1× | Tutorial step ~115 — early learning |
-| 5,000 | 12.2× | Tutorial step ~230 — starting to look right |
-| 10,000 | 24.4× | Tutorial step ~460 — solid character |
-| 20,000 | 48.8× | Tutorial step ~930 — approaching tutorial's step 2000 quality |
-
-**Important nuance:** The tutorial was memorizing a single scene. Our 409 clips span 10 seasons with varied backgrounds, other characters, and lighting. More variety = the model generalizes rather than memorizes, so it needs **fewer repetitions per clip** to learn Skye's core identity — but the relationship isn't linear. Working assumption: we need roughly **20–50 repetitions per clip** (8,000–20,000 steps) for strong character fidelity, vs the tutorial's 263 repetitions for a single-scene overfit.
-
-**Loss curve expectations:**
-
-| Phase | Loss range | What it means |
-|-------|-----------|---------------|
-| Step 0 | ~0.8–1.0 | Base model has no concept of Skye yet |
-| Steps 1–500 | Rapid drop | Model learns Skye's basic colors, shape, and helicopter |
-| Steps 500–3000 | Slower descent | Voice character, expression style, motion patterns |
-| Steps 3000–10000 | Gradual plateau | Fine-grained identity — face details, speech inflections |
-| Plateau | ~0.3–0.5 | Good training range |
-| Below 0.2 | Overfitting risk | Especially if validation videos start looking identical |
-
-If loss flattens above 0.6 for many steps: underfitting — raise rank or add FFN layers.
-If loss drops below 0.2 fast with <5000 steps: likely memorizing, not generalizing — check that data has real variety.
+The configs we wrote live at [packages/ltx-trainer/configs/](packages/ltx-trainer/configs/). You can read them — they are self-documenting YAML files.
 
 ---
 
-## Experiment Plan
+## The Data
 
-### Phase 0 — Full Data Pipeline (prerequisite, run once)
+- **111 clips** downloaded from `gs://video_gen_dataset/TinyStories/data_sets/golden_skye/`
+- Skye-only, all seasons, avg ~17.6s per clip (center-cropped to 2-4s during preprocessing)
+- Each clip has: Skye's exact dialogue + detailed scene description as the caption
+- Preview video with subtitles: `output/skye_preview.mp4` — watch this to review data quality
 
-**Step 1: Download all clips** (~20–40 min)
+---
+
+## Goals — Short Term and Long Term
+
+### Short-Term Goal (next 2–3 weeks)
+**Produce one good birthday message video.**
+
+Specifically: given the start frame `skye_helicopter_birthday_gili.png`, generate a 6–10 second video where Skye is visually faithful to the character, says a custom birthday message in her voice, and looks naturally animated.
+
+Success criteria:
+- Pink Cockapoo, aviator helmet, helicopter cockpit — visually unmistakably Skye
+- Voice sounds like a young girl's, Skye's energy and pitch
+- Mouth moves with the speech
+- Smooth motion, no flicker or jitter
+
+### Long-Term Goal
+**A reliable production pipeline.** Given any birthday child's name + a short message, generate a 10–15 second Skye video on demand. This means:
+- A trained LoRA checkpoint that generalizes (not memorized scenes)
+- A reliable inference script (`run_skye_like_api.py`)
+- The ability to provide different start frames for different "scenes"
+
+---
+
+## Validation Start Frames
+
+Yes — you should create multiple start frames to test different scenarios. The more varied the test frames, the more you learn about what the LoRA can and can't do.
+
+**Suggested start frames to prepare:**
+1. ✅ `skye_helicopter_birthday_gili.png` — already on server. Skye in cockpit, helicopter.
+2. Skye flying with her helicopter backpack (outdoors, aerial shot)
+3. Skye looking directly at camera, smiling (portrait/talking head style)
+4. Skye at the Lookout tower with other pups visible
+
+For each one, we can also write a matching validation prompt (what you want her to do/say in the generated video). More start frames = better evaluation of whether the LoRA generalizes to novel compositions.
+
+**How to add a new start frame:**
+1. Place the image in `inputs/` locally
+2. `scp` it to `/home/efrattaig/data/start_frames/` on the server
+3. Add it to the `images:` list in the config you want to validate with
+
+---
+
+## How to Tell Which Training Was Better
+
+Use **three signals together** — no single one is enough:
+
+### 1. Loss Curve (W&B, during training)
+Watch the `train/loss` chart. Expected shape:
+- **Drops fast early (steps 1–500):** Model learning basic colors, shape, helicopter
+- **Slower descent (500–3000):** Voice character, motion style, identity details
+- **Plateau (3000+):** Fine-grained details settling
+- **Good plateau range: 0.3–0.5.** Below 0.2 = overfitting risk. Stuck above 0.6 = underfitting.
+
+Compare loss curves across experiments in W&B (they're all in the same project).
+
+### 2. W&B Validation Videos (every 250 steps, automatic)
+The training generates videos from the validation prompts at each checkpoint. These run with the simple single-stage pipeline (fast, lower quality than production) — use them to watch the **trend**, not judge final quality.
+
+Ask at each checkpoint:
+- Step 500: Can I tell this is a pink dog? Is the helicopter there?
+- Step 1000: Does she look like Skye specifically vs. a generic cartoon dog?
+- Step 2500: Does the voice sound right? Does she move naturally?
+- Step 5000: Does it look like Skye from the show?
+
+### 3. Production Evaluation with `run_skye_like_api.py` (at milestones)
+This runs the full 2-stage HQ pipeline — the same quality as production output. Run it at key checkpoints and compare files side-by-side:
+
 ```bash
-# Already running — check progress:
-tail -f /tmp/ltx_current.log
-```
-Output: `/home/efrattaig/data/golden_skye_train/dataset.json` + MP4 files
+# Baseline (no LoRA) — run once and keep as reference
+uv run python run_skye_like_api.py
 
-**Step 2: Preprocess — encode all latents** (~3–6 hrs depending on clip count)
+# After EXP-1 step 1000:
+uv run python run_skye_like_api.py \
+  --lora /home/efrattaig/LTX-2/outputs/skye_exp1_baseline/checkpoint-1000/pytorch_lora_weights.safetensors
+
+# After EXP-2 step 2500:
+uv run python run_skye_like_api.py \
+  --lora /home/efrattaig/LTX-2/outputs/skye_exp2_standard/checkpoint-2500/pytorch_lora_weights.safetensors
+
+# After EXP-2 step 5000:
+uv run python run_skye_like_api.py \
+  --lora /home/efrattaig/LTX-2/outputs/skye_exp2_standard/checkpoint-5000/pytorch_lora_weights.safetensors
+```
+
+Output files are named `..._base.mp4`, `..._lora-checkpoint-1000.mp4` etc — easy to compare.
+
+**What "better" looks like:** More Skye-like appearance, clearer voice, smoother motion in the HQ output. Trust your eyes over the loss number.
+
+---
+
+## Experiment Schedule
+
+### Step 0 — Preprocessing (tonight, ~3–4 hrs, runs once)
+
 ```bash
 ssh efrattaig@35.238.2.51
-cd /home/efrattaig/LTX-2
-nohup /home/efrattaig/.local/bin/uv run python packages/ltx-trainer/scripts/process_dataset.py \
-  /home/efrattaig/data/golden_skye_train/dataset.json \
-  --resolution-buckets "960x544x49;960x544x97" \
-  --model-path /home/efrattaig/models/LTX-2.3/ltx-2.3-22b-dev.safetensors \
-  --text-encoder-path /home/efrattaig/models/gemma-3-12b-it-qat-q4_0-unquantized \
-  --with-audio \
-  --output-dir /home/efrattaig/data/golden_skye_preprocessed \
-  --load-text-encoder-in-8bit \
-  > /tmp/ltx_current.log 2>&1 < /dev/null &
+nohup /tmp/launch_preprocess.sh </dev/null >/dev/null 2>&1 &
+# Watch: tail -f /tmp/ltx_preprocess.log
 ```
-Output: `golden_skye_preprocessed/latents/`, `conditions/`, `audio_latents/` — all file counts must match before proceeding.
+
+This encodes all 111 clips into latents for training. Output: `/home/efrattaig/data/golden_skye_preprocessed/` with `latents/`, `conditions/`, `audio_latents/` — all must have 111 files.
 
 ---
 
-### Phase 1 — First Training Runs (run in parallel on two machines)
+### EXP-1 — Baseline (rank 16, 2000 steps)
 
-Once preprocessing is done, copy preprocessed data to a second server and launch both experiments simultaneously.
+**Why:** Quick sanity check that the character is being learned on the full dataset. Rank 16 is smaller/faster. If EXP-1 at step 500 shows Skye's pink coloring and cockpit, the data pipeline is confirmed.
 
-**Machine 1: EXP-1 — Baseline (rank 16, 2000 steps)**
+**Config:** [packages/ltx-trainer/configs/skye_exp1_baseline.yaml](packages/ltx-trainer/configs/skye_exp1_baseline.yaml)
 
-*Why:* Quick validation that the character is being learned with the full dataset. Rank 16 = fewer parameters, faster iteration. If this looks good at step 500, we have confidence EXP-2 will work.
+Key parameters:
+```yaml
+lora:
+  rank: 16
+  alpha: 16
+  target_modules: [to_k, to_q, to_v, to_out.0]   # attention layers only
+optimization:
+  steps: 2000
+  learning_rate: 1e-4
+data:
+  preprocessed_data_root: /home/efrattaig/data/golden_skye_preprocessed
+```
 
-*Config:* `packages/ltx-trainer/configs/skye_exp1_baseline.yaml` — update `steps: 2000`
-
-*Decision point:* At step 500 — validation video should show pink Cockapoo in recognizable Skye-like context. If completely generic: check caption quality and audio latent counts.
-
+**Run:**
 ```bash
-# Machine 1
-nohup /tmp/launch_train.sh </dev/null >/dev/null 2>&1 &  # (update script to use exp1 config)
+# Update launch_train.sh to point to exp1 config, then:
+ssh efrattaig@35.238.2.51 "sed -i 's/skye_dryrun/skye_exp1_baseline/' /tmp/launch_train.sh"
+nohup /tmp/launch_train.sh </dev/null >/dev/null 2>&1 &
 ```
 
-**Machine 2: EXP-4 — Image-to-Video focus (rank 32, 2500 steps)**
+**Decision at step 500:** If validation shows Skye's colors and helicopter → launch EXP-2 immediately (don't wait for EXP-1 to finish).
 
-*Why:* This is the production use case — you provide a clean Skye illustration as the first frame and animate it. `first_frame_conditioning_p=0.8` means 80% of training steps practice from a given start frame. This runs independently of EXP-1/2.
+---
 
-*Config:* `packages/ltx-trainer/configs/skye_exp4_i2v.yaml`
+### EXP-4 — Image-to-Video Focus (rank 32, 2500 steps) — run in parallel with EXP-1
 
-*Decision point:* At step 1000 — does the model continue motion naturally from the start frame image? Voice should match.
+**Why:** EXP-4 is the most production-relevant experiment. It trains with `first_frame_conditioning_p=0.8` — 80% of steps practice generating from a start frame. This is exactly the birthday message workflow: you provide Skye's portrait, it animates her.
 
+**Config:** [packages/ltx-trainer/configs/skye_exp4_i2v.yaml](packages/ltx-trainer/configs/skye_exp4_i2v.yaml)
+
+Key difference from other experiments:
+```yaml
+training_strategy:
+  first_frame_conditioning_p: 0.8   # 80% of steps use a conditioning start frame
+```
+
+**Run on Machine 2 (second server, same preprocessed data copied over).**
+
+**Decision at step 1000:** Does validation video continue motion naturally from the start frame? If yes, extend to 5000 steps.
+
+---
+
+### EXP-2 — Main Character LoRA (rank 32, 5000 steps) ⭐ Primary
+
+**Why 5000 steps:** With 111 clips at batch_size=1, 5000 steps = ~45 exposures per clip. The tutorial needed ~263 reps with 19 clips for "excellent" results; our dataset has more variety (10 seasons, different scenes), so less memorization is needed, but 45 reps is a reasonable target for strong character identity.
+
+**Config:** [packages/ltx-trainer/configs/skye_exp2_standard.yaml](packages/ltx-trainer/configs/skye_exp2_standard.yaml)
+
+```yaml
+lora:
+  rank: 32
+  alpha: 32
+optimization:
+  steps: 5000   # update from 2500
+  learning_rate: 1e-4
+```
+
+**Checkpoints saved every 250 steps** — evaluate with `run_skye_like_api.py` at steps 1000, 2500, 5000.
+
+**Decision at step 2500:** If loss is still falling and validation shows clear improvement → extend to 10,000 steps on the same run (just update `steps` in config and continue from checkpoint).
+
+---
+
+### EXP-3 — High Capacity (rank 32 + FFN, 3000 steps) — contingency only
+
+**Run only if EXP-2 looks generic at step 2500.** Adds feed-forward layers (the "motion memory") to the LoRA targets.
+
+**Config:** [packages/ltx-trainer/configs/skye_exp3_highcap.yaml](packages/ltx-trainer/configs/skye_exp3_highcap.yaml)
+
+---
+
+### Parallel Execution (two machines)
+
+```
+Machine 1:  [Preprocessing] → [EXP-1, 2000 steps] → [EXP-2, 5000 steps]
+Machine 2:  [Copy preprocessed data] → [EXP-4, 2500–5000 steps]
+```
+
+Machine 2 needs:
 ```bash
-# Machine 2
-# (same launch pattern, different config)
+# On Machine 1 — copy preprocessed data to Machine 2
+rsync -avz /home/efrattaig/data/golden_skye_preprocessed/ user@machine2:/data/golden_skye_preprocessed/
+# Then git pull on Machine 2 to get the configs, and launch EXP-4
 ```
 
 ---
 
-### Phase 2 — Main Character LoRA (sequential, after EXP-1 shows learning)
+## Timeline
 
-**EXP-2 — Standard (rank 32, 5000 steps)** ← Primary experiment
-
-*Why rank 32:* The tutorial confirmed rank 32 is sufficient for full character+voice capture. Rank 16 (EXP-1) will likely underfit at the fine detail level.
-
-*Why 5000 steps:* With our dataset size (~100–400 clips), 5000 steps gives ~12–50 clip exposures — roughly equivalent to where the tutorial was when it called results "pretty good" (step 2000 with 19 clips = ~105 reps/clip × correction factor for dataset variety). Check W&B at step 2500 and extend if the character is still improving.
-
-*Config:* `packages/ltx-trainer/configs/skye_exp2_standard.yaml` — update `steps: 5000`
-
-*Decision point at step 2500:* If validation video shows clear Skye identity → continue to 5000. If loss is still falling steeply → consider extending to 10000.
-
-```bash
-# After EXP-1 confirms learning (step 500+):
-# Update config steps to 5000, launch on Machine 1 (after EXP-1 completes or on a third machine)
-```
-
----
-
-### Phase 3 — Conditional (only if EXP-2 underfits)
-
-**EXP-3 — High Capacity (rank 32 + FFN, 3000 steps)**
-
-*When to run:* Only if EXP-2 results at step 2500 show the character looks generic, movements don't match Skye's style (helicopter spin, paw gestures), or face expressions aren't captured.
-
-*What it adds:* Feed-forward layers (`ff.net.0.proj`, `ff.net.2`, `audio_ff.*`) — these store associative memory and are responsible for motion style and behavioral patterns.
-
-*Config:* `packages/ltx-trainer/configs/skye_exp3_highcap.yaml`
-
----
-
-### Execution Timeline
-
-```
-[Now]          Download 409 clips (~30 min)
-               ↓
-[+30 min]      Preprocess all clips (~4-6 hrs)
-               ↓
-[+5–7 hrs]     Machine 1: EXP-1 (2000 steps, ~5 hrs)
-               Machine 2: EXP-4 (2500 steps, ~6 hrs)  ← parallel
-               ↓
-[+12 hrs]      Evaluate EXP-1 step 500 validation
-               ↓
-[If OK]        Machine 1: EXP-2 (5000 steps, ~12 hrs)
-               ↓
-[+24 hrs]      Evaluate EXP-2 at step 2500
-               ↓
-[If underfitting] → EXP-3
-[If I2V needed]   → EXP-4 already running
-```
-
----
-
-## Evaluation Criteria
-
-At each validation checkpoint, ask:
-
-1. **Appearance** — Is the character pink? Cockapoo breed? Aviator helmet visible?
-2. **Motion** — Does she move naturally? Helicopter-style flight patterns?
-3. **Voice** — Does the audio sound like a young girl's voice? Skye's pitch and energy?
-4. **Prompt adherence** — Does the generated video match what the validation prompt says she's doing?
-5. **Loss trend** — Is it still falling? How fast? Compare across runs in W&B.
-
----
-
-## Key Files
-
-| File | Purpose |
-|------|---------|
-| `packages/ltx-trainer/scripts/train.py` | **The training entry point — official Lightricks script** |
-| `packages/ltx-trainer/scripts/process_dataset.py` | Preprocessing: encodes all latents |
-| `packages/ltx-trainer/configs/skye_exp1_baseline.yaml` | Rank 16, 2000 steps |
-| `packages/ltx-trainer/configs/skye_exp2_standard.yaml` | Rank 32, 5000 steps ⭐ primary |
-| `packages/ltx-trainer/configs/skye_exp3_highcap.yaml` | Rank 32 + FFN (contingency) |
-| `packages/ltx-trainer/configs/skye_exp4_i2v.yaml` | Rank 32, I2V focused |
-| `LTX_2.3_LoRA_Training_Analysis.md` | Architecture deep-dive with plain-language explanations |
+| When | What | Where |
+|------|------|-------|
+| Tonight | Preprocessing (3–4 hrs) | Machine 1 |
+| Tomorrow morning | Review preprocessing output, launch EXP-1 + EXP-4 | Both machines |
+| +5 hrs (EXP-1 step 500) | Check W&B — is Skye recognizable? | |
+| +10 hrs (EXP-1 done) | Launch EXP-2 on Machine 1 | |
+| +12 hrs (EXP-2 step 2500) | Run `run_skye_like_api.py --lora checkpoint-2500` | |
+| +24 hrs (EXP-2 step 5000) | Run HQ eval, compare to baseline and EXP-4 | |
+| If good | Done — produce birthday video | |
+| If underfitting | Continue EXP-2 to 10k, or launch EXP-3 | |
 
 ---
 
 ## Current Status
 
-- ✅ Dry run (10 clips, 100 steps): pipeline confirmed working end-to-end
-- ✅ FFmpeg installed on server (required for audio extraction)
-- ✅ W&B authenticated and logging validation videos
-- ✅ Start frame (`skye_helicopter_birthday_gili.png`) on server, wired into validation
-- ✅ `process_captions.py` bug fixed (absolute path handling)
-- 🔄 **Full dataset download in progress** (`/tmp/ltx_current.log`)
-- ⬜ Full preprocessing
-- ⬜ EXP-1 + EXP-4 (parallel)
-- ⬜ EXP-2 (main run)
+| Step | Status |
+|------|--------|
+| ✅ Dry run (10 clips, 100 steps) | Done — pipeline confirmed |
+| ✅ FFmpeg installed | Done |
+| ✅ W&B authenticated | Done |
+| ✅ Full download (111 clips) | Done |
+| ✅ Preview video with subtitles | Done — `output/skye_preview.mp4` |
+| ✅ `run_skye_like_api.py --lora` flag | Done |
+| 🔄 **Start preprocessing** | Ready to launch |
+| ⬜ EXP-1 + EXP-4 (parallel) | Waiting on preprocessing |
+| ⬜ EXP-2 (main) | Waiting on EXP-1 step 500 |
+| ⬜ Production birthday video | End goal |
