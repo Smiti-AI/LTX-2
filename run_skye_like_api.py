@@ -39,21 +39,22 @@ DEFAULT_PROMPT = (
     "cinematic lighting, smooth character animation, preschool-friendly aesthetic, "
     "4k render, detailed textures, expressive facial expressions. "
     "Pink pup in pilot helmet and flight gear inside helicopter cockpit, hovering in place. "
+    "Both paws gripping the helicopter controls at all times — paws never leave the controls, no waving. "
     "Rotors spinning overhead. Camera locked on cockpit — no camera movement.\n\n"
     "[DIALOGUE - WHAT SHE SAYS]\n"
     "Pink aviator pup (in a warm, cheerful voice, speaking directly to camera): "
     '"Hi Gili — I heard it\'s your birthday, so I came to wish you a happy birthday!" '
-    "Expressive face, mouth moving clearly with the words, paw raised in a friendly wave.\n\n"
+    "Expressive face, mouth moving clearly with the words. Both paws remain on the controls.\n\n"
     "[DIALOGUE - WHAT SHE SAYS]\n"
     "Pink aviator pup (warmly, sincerely): "
     '"Your mom, Efrat, asked me to tell you that you\'re a wonderful girl! '
     "You're an amazing person! A wonderful human — you're perfect just the way you are.\" "
-    "Warm smile, expressive eyes, mouth moving with the speech.\n\n"
+    "Warm smile, expressive eyes, mouth moving with the speech. Paws steady on the controls.\n\n"
     "[DIALOGUE - WHAT SHE SAYS]\n"
     "Pink aviator pup (enthusiastic, upbeat): "
     '"Keep being a great big sister to your little sister Aya, and most importantly — '
     'stay happy and joyful! From all of us here at Adventure Bay." '
-    "Big smile, excited expression, mouth moving animatedly."
+    "Big smile, excited expression, mouth moving animatedly. Both paws on the helicopter controls throughout."
 )
 
 # ══════════════════════════════════════════════════════════════════════════════
