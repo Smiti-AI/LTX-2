@@ -93,12 +93,23 @@ def frames_for_duration(seconds: float, fps: float) -> int:
     return max(17, 8 * k + 1)
 
 
-def build_pipeline():
+def build_pipeline(lora_path: Path | None = None, lora_strength: float = 1.0):
     import torch
     torch.backends.cudnn.enabled = False  # prevents BigVGAN cuBLASLt crash
 
     from ltx_core.loader import LTXV_LORA_COMFY_RENAMING_MAP, LoraPathStrengthAndSDOps
     from ltx_pipelines.ti2vid_two_stages_hq import TI2VidTwoStagesHQPipeline
+
+    global _skye_loras
+    if lora_path is not None:
+        _skye_loras = (LoraPathStrengthAndSDOps(
+            path=str(lora_path),
+            strength=lora_strength,
+            sd_ops=None,
+        ),)
+        print(f"  skye lora : {lora_path}  (strength={lora_strength})")
+    else:
+        _skye_loras = ()
 
     distilled_lora = [LoraPathStrengthAndSDOps(
         path=str(DISTILLED_LORA),
@@ -113,7 +124,7 @@ def build_pipeline():
         distilled_lora_strength_stage_2=DEFAULT_LORA_S2,
         spatial_upsampler_path=str(SPATIAL_UPSAMPLER),
         gemma_root=str(GEMMA_ROOT),
-        loras=(),
+        loras=_skye_loras,
     )
 
 
@@ -187,6 +198,10 @@ def main() -> int:
     parser.add_argument("--image", type=Path, default=DEFAULT_IMAGE,
                         help="Start frame image path.")
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
+    parser.add_argument("--lora", type=Path, default=None,
+                        help="Path to Skye LoRA .safetensors checkpoint to evaluate.")
+    parser.add_argument("--lora-strength", type=float, default=1.0,
+                        help="LoRA blend strength (0=base model, 1=full LoRA).")
     args = parser.parse_args()
 
     image_path = args.image
@@ -232,7 +247,7 @@ def main() -> int:
     print()
 
     print("Loading pipeline…")
-    pipeline = build_pipeline()
+    pipeline = build_pipeline(lora_path=args.lora, lora_strength=args.lora_strength)
 
     errors = 0
     for dur in args.durations:
@@ -240,9 +255,10 @@ def main() -> int:
         nf = frames_for_duration(dur, DEFAULT_FPS)
         actual_dur = round(nf / DEFAULT_FPS, 2)
         img_tag = image_path.stem.replace(" ", "_")[:40]
+        lora_tag = f"_lora-{args.lora.stem[:20]}" if args.lora else "_base"
         out_name = (
             f"run_skye_like_api__{img_tag}__{DEFAULT_WIDTH}x{DEFAULT_HEIGHT}_"
-            f"{DEFAULT_STEPS}steps_cfg{args.video_cfg}_{actual_dur}s_seed{seed}.mp4"
+            f"{DEFAULT_STEPS}steps_cfg{args.video_cfg}_{actual_dur}s_seed{seed}{lora_tag}.mp4"
         )
         output_path = args.output_dir / out_name
 
