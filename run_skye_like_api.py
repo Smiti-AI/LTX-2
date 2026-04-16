@@ -37,21 +37,23 @@ DEFAULT_IMAGE = SCRIPT_DIR / "inputs/BM_v1/benchmark_v1/skye_helicopter_birthday
 DEFAULT_PROMPT = (
     "High-quality 3D CGI children's cartoon style, vibrant colors, clean CGI, "
     "cinematic lighting, smooth character animation, preschool-friendly aesthetic, "
-    "4k render, detailed textures, expressive facial expressions\n\n"
-    "[SHOT]\n"
-    "Static shot; helicopter locked in hover (no flight motion). "
-    "Identical framing to the reference. Cockpit, pink pup in flight gear, rotors spinning.\n\n"
-    "[SHE SAYS]\n"
-    '"Hi Gili — I heard it\'s your birthday, so I came to wish you a happy birthday!"\n'
-    "Same static framing; helicopter still hovering — no flight motion.\n\n"
-    "[SHE SAYS]\n"
+    "4k render, detailed textures, expressive facial expressions. "
+    "Pink pup in pilot helmet and flight gear inside helicopter cockpit, hovering in place. "
+    "Rotors spinning overhead. Camera locked on cockpit — no camera movement.\n\n"
+    "[DIALOGUE - WHAT SHE SAYS]\n"
+    "Pink aviator pup (in a warm, cheerful voice, speaking directly to camera): "
+    '"Hi Gili — I heard it\'s your birthday, so I came to wish you a happy birthday!" '
+    "Expressive face, mouth moving clearly with the words, paw raised in a friendly wave.\n\n"
+    "[DIALOGUE - WHAT SHE SAYS]\n"
+    "Pink aviator pup (warmly, sincerely): "
     '"Your mom, Efrat, asked me to tell you that you\'re a wonderful girl! '
-    "You're an amazing person! A wonderful human — you're perfect just the way you are.\"\n"
-    "[SHOT]\n"
-    "Same static framing; helicopter still hovering — no flight motion.\n\n"
-    "[SHE SAYS]\n"
+    "You're an amazing person! A wonderful human — you're perfect just the way you are.\" "
+    "Warm smile, expressive eyes, mouth moving with the speech.\n\n"
+    "[DIALOGUE - WHAT SHE SAYS]\n"
+    "Pink aviator pup (enthusiastic, upbeat): "
     '"Keep being a great big sister to your little sister Aya, and most importantly — '
-    'stay happy and joyful! From all of us here at Adventure Bay."'
+    'stay happy and joyful! From all of us here at Adventure Bay." '
+    "Big smile, excited expression, mouth moving animatedly."
 )
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -68,7 +70,7 @@ GEMMA_ROOT        = Path("/home/efrattaig/models/gemma-3-12b-it-qat-q4_0-unquant
 #  EDIT THESE — generation defaults (can also be overridden via CLI flags)
 # ══════════════════════════════════════════════════════════════════════════════
 
-DEFAULT_DURATIONS  = [6.0, 8.0, 10.0]   # seconds — passed as --durations to override
+DEFAULT_DURATIONS  = [10.0]   # seconds — passed as --durations to override
 DEFAULT_FPS        = 25.0
 DEFAULT_WIDTH      = 1920                # stage-2 output; stage-1 uses half (960)
 DEFAULT_HEIGHT     = 1088                # stage-2 output; stage-1 uses half (544)
