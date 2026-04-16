@@ -47,7 +47,7 @@ DEFAULT_OUTPUTS_BASE = SCRIPT_DIR / "outputs"
 #  EDIT THESE — benchmark generation params (kept fixed for fair comparison)
 # ══════════════════════════════════════════════════════════════════════════════
 
-BM_DURATION_S  = 5.0    # short enough to be fast, long enough to show character
+BM_DURATION_S  = 10.0   # each clip; comparison video = 3 × 10s = 30s total
 BM_SEED        = 42
 BM_FPS         = 25.0
 BM_WIDTH       = 768    # stage-2; stage-1 uses half
@@ -378,23 +378,82 @@ def generate_one(pipeline, *, scene, num_frames, video_guider_params,
 
 def concat_comparison(base_path: Path, lora_path: Path, out_path: Path,
                       lora_label: str) -> None:
-    """Concatenate base + lora videos with title overlays using ffmpeg."""
-    # Escape characters that ffmpeg's drawtext treats as special
+    """Build a 3-clip side-by-side comparison video using ffmpeg.
+
+    Clip 1 (0–10s):  [Base | LoRA]  — both side by side, mixed audio
+    Clip 2 (10–20s): [Base | black] — base only, base audio
+    Clip 3 (20–30s): [black | LoRA] — LoRA only, LoRA audio
+
+    Output: 1536×1024 (768×1024 per half), 30 seconds total.
+    """
     def esc(s: str) -> str:
-        return s.replace("'", "\\'").replace(":", "\\:")
+        return s.replace("'", "\\'").replace(":", "\\:").replace("[", "\\[").replace("]", "\\]")
 
-    base_label_esc = esc("Base LTX-2.3")
-    lora_label_esc = esc(lora_label)
+    base_lbl = esc("Base LTX-2.3")
+    lora_lbl = esc(lora_label)
 
-    font_size = 36
-    box = "box=1:boxcolor=black@0.55:boxborderw=12"
+    fs_small = 28   # per-model label font size
+    fs_large = 38   # section title font size
+    box = "box=1:boxcolor=black@0.6:boxborderw=10"
 
-    filter_complex = (
-        f"[0:v]drawtext=text='{base_label_esc}':fontsize={font_size}:fontcolor=white"
-        f":x=20:y=20:{box}[v0];"
-        f"[1:v]drawtext=text='{lora_label_esc}':fontsize={font_size}:fontcolor=yellow"
-        f":x=20:y=20:{box}[v1];"
-        f"[v0][0:a][v1][1:a]concat=n=2:v=1:a=1[outv][outa]"
+    # Each source video is 768×1024.  We need a 768×1024 black silent clip
+    # that exactly matches duration/fps/audio-rate of the sources.
+    W, H = BM_WIDTH, BM_HEIGHT   # 768 × 1024 per half
+    fps   = BM_FPS                # 25
+    dur   = BM_DURATION_S         # 10.0 s
+    arate = 44100                 # audio sample rate used by the pipeline
+
+    # ── filter_complex ────────────────────────────────────────────────────────
+    # Inputs:  [0] = base,  [1] = lora
+    # We generate two silent-black pads inline:
+    #   [2] = black video for clip-2 right side (base solo)
+    #   [3] = black video for clip-3 left side  (LoRA solo)
+    # silent audio is synthesised with aevalsrc=0.
+    fc = (
+        # ── Split sources so we can use each twice ──────────────────────────
+        f"[0:v]split=2[base_v1][base_v2];"
+        f"[0:a]asplit=2[base_a1][base_a2];"
+        f"[1:v]split=2[lora_v1][lora_v2];"
+        f"[1:a]asplit=2[lora_a1][lora_a2];"
+
+        # ── Black silent pad (shared geometry / duration) ───────────────────
+        f"color=black:s={W}x{H}:r={fps}:d={dur}[black_v1];"
+        f"color=black:s={W}x{H}:r={fps}:d={dur}[black_v2];"
+        f"aevalsrc=0:s={arate}:d={dur}[sil1];"
+        f"aevalsrc=0:s={arate}:d={dur}[sil2];"
+
+        # ── Clip 1: both side by side ───────────────────────────────────────
+        # Add per-model labels at bottom of each half
+        f"[base_v1]drawtext=text='{base_lbl}':fontsize={fs_small}:fontcolor=white"
+        f":x=10:y=h-th-10:{box}[bv1];"
+        f"[lora_v1]drawtext=text='{lora_lbl}':fontsize={fs_small}:fontcolor=yellow"
+        f":x=10:y=h-th-10:{box}[lv1];"
+        # Stack horizontally
+        f"[bv1][lv1]hstack=inputs=2[side1];"
+        # Section label centred at top of combined 1536-wide frame
+        f"[side1]drawtext=text='[ Base | LoRA ]':fontsize={fs_large}:fontcolor=white"
+        f":x=(w-tw)/2:y=18:{box}[clip1v];"
+        # Mix both audio streams
+        f"[base_a1][lora_a1]amix=inputs=2:duration=first:normalize=0[clip1a];"
+
+        # ── Clip 2: base left, black right ──────────────────────────────────
+        f"[base_v2]drawtext=text='{base_lbl}':fontsize={fs_small}:fontcolor=white"
+        f":x=10:y=h-th-10:{box}[bv2];"
+        f"[bv2][black_v1]hstack=inputs=2[side2];"
+        f"[side2]drawtext=text='[ Base only ]':fontsize={fs_large}:fontcolor=white"
+        f":x=(w-tw)/2:y=18:{box}[clip2v];"
+        f"[base_a2][sil1]amix=inputs=2:duration=first:normalize=0[clip2a];"
+
+        # ── Clip 3: black left, LoRA right ──────────────────────────────────
+        f"[lora_v2]drawtext=text='{lora_lbl}':fontsize={fs_small}:fontcolor=yellow"
+        f":x=10:y=h-th-10:{box}[lv3];"
+        f"[black_v2][lv3]hstack=inputs=2[side3];"
+        f"[side3]drawtext=text='[ LoRA only ]':fontsize={fs_large}:fontcolor=yellow"
+        f":x=(w-tw)/2:y=18:{box}[clip3v];"
+        f"[lora_a2][sil2]amix=inputs=2:duration=first:normalize=0[clip3a];"
+
+        # ── Concatenate 3 clips ──────────────────────────────────────────────
+        f"[clip1v][clip1a][clip2v][clip2a][clip3v][clip3a]concat=n=3:v=1:a=1[outv][outa]"
     )
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -403,7 +462,7 @@ def concat_comparison(base_path: Path, lora_path: Path, out_path: Path,
             "ffmpeg", "-y",
             "-i", str(base_path),
             "-i", str(lora_path),
-            "-filter_complex", filter_complex,
+            "-filter_complex", fc,
             "-map", "[outv]", "-map", "[outa]",
             "-c:v", "libx264", "-crf", "18",
             "-c:a", "aac", "-b:a", "192k",
