@@ -498,6 +498,10 @@ def main() -> int:
         help="Run only these scene(s). Default: all.",
     )
     parser.add_argument(
+        "--steps", type=int, nargs="+", default=None,
+        help="Only benchmark these checkpoint step numbers. Default: all found.",
+    )
+    parser.add_argument(
         "--dry-run", action="store_true",
         help="Print plan without generating anything.",
     )
@@ -548,6 +552,14 @@ def main() -> int:
     if not checkpoints:
         print("No checkpoints found in any experiment dir yet.")
         return 0
+
+    # ── Filter to requested steps ─────────────────────────────────────────────
+    if args.steps:
+        allowed = set(args.steps)
+        checkpoints = [(exp, step, p) for exp, step, p in checkpoints if step in allowed]
+        if not checkpoints:
+            print(f"No checkpoints found at steps {sorted(allowed)}.", file=sys.stderr)
+            return 1
 
     # ── Build work lists ──────────────────────────────────────────────────────
     # base_needed:   scenes where base video doesn't exist yet
