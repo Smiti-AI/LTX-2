@@ -105,7 +105,7 @@ def build_pipeline(lora_path: Path | None = None, lora_strength: float = 1.0):
         _skye_loras = (LoraPathStrengthAndSDOps(
             path=str(lora_path),
             strength=lora_strength,
-            sd_ops=None,
+            sd_ops=LTXV_LORA_COMFY_RENAMING_MAP,
         ),)
         print(f"  skye lora : {lora_path}  (strength={lora_strength})")
     else:

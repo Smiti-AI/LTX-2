@@ -317,7 +317,7 @@ def build_pipeline_lora(lora_path: Path):
         distilled_lora_strength_stage_2=BM_LORA_S2,
         spatial_upsampler_path=str(SPATIAL_UPSAMPLER),
         gemma_root=str(GEMMA_ROOT),
-        loras=(LoraPathStrengthAndSDOps(path=str(lora_path), strength=1.0, sd_ops=None),),
+        loras=(LoraPathStrengthAndSDOps(path=str(lora_path), strength=1.0, sd_ops=LTXV_LORA_COMFY_RENAMING_MAP),),
     )
 
 def unload_pipeline(pipeline) -> None:
