@@ -17,7 +17,7 @@ model:
   model_path: "/home/efrat_t_smiti_ai/models/LTX-2.3/ltx-2.3-22b-dev.safetensors"
   text_encoder_path: "/home/efrat_t_smiti_ai/models/gemma-3-12b-it-qat-q4_0-unquantized"
   training_mode: "lora"
-  load_checkpoint: null
+  load_checkpoint: "outputs/skye_exp3_highcap/checkpoints/lora_weights_step_03000.safetensors"
 
 lora:
   rank: 32
@@ -43,7 +43,7 @@ training_strategy:
 
 optimization:
   learning_rate: 1e-4
-  steps: 3000
+  steps: 10000
   batch_size: 1
   gradient_accumulation_steps: 1
   max_grad_norm: 1.0
