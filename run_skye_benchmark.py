@@ -34,11 +34,11 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 BM_IMAGES_DIR = SCRIPT_DIR / "inputs" / "sky_bm"
 
 # Model weights — same as run_skye_like_api.py
-MODELS_DIR        = Path("/home/efrattaig/models/LTX-2.3")
+MODELS_DIR        = Path.home() / "models" / "LTX-2.3"
 CHECKPOINT        = MODELS_DIR / "ltx-2.3-22b-dev.safetensors"
 DISTILLED_LORA    = MODELS_DIR / "ltx-2.3-22b-distilled-lora-384.safetensors"
 SPATIAL_UPSAMPLER = MODELS_DIR / "ltx-2.3-spatial-upscaler-x2-1.0.safetensors"
-GEMMA_ROOT        = Path("/home/efrattaig/models/gemma-3-12b-it-qat-q4_0-unquantized")
+GEMMA_ROOT        = Path.home() / "models" / "gemma-3-12b-it-qat-q4_0-unquantized"
 
 # Base dir that contains experiment output subdirs
 DEFAULT_OUTPUTS_BASE = SCRIPT_DIR / "outputs"
