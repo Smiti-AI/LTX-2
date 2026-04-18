@@ -716,6 +716,12 @@ class LtxvTrainer:
             gradient_accumulation_steps=self._config.optimization.gradient_accumulation_steps,
         )
 
+        # _load_text_encoder_and_cache_embeddings() runs before this point, before
+        # torch.cuda.set_device(local_rank) is called, so the embeddings_processor
+        # was loaded on cuda:0 for every rank. Move it to the correct device now.
+        if self._embeddings_processor is not None:
+            self._embeddings_processor = self._embeddings_processor.to(self._accelerator.device)
+
         if self._accelerator.num_processes > 1:
             logger.info(
                 f"{self._accelerator.distributed_type.value} distributed training enabled "
