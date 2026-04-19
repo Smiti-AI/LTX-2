@@ -122,6 +122,24 @@ Output files are named `..._base.mp4`, `..._lora-checkpoint-1000.mp4` etc — ea
 
 ## Experiment Schedule
 
+### All Experiments at a Glance
+
+| Experiment | Config | Rank | Steps | I2V Cond. | Target Modules | Resolution | Purpose |
+|-----------|--------|------|-------|-----------|----------------|------------|---------|
+| Dry run | `skye_dryrun.yaml` | 16 | 100 | 50% | Attn | 960×544 | Pipeline validation |
+| **EXP-1** | `skye_exp1_baseline.yaml` | 16 | 1000 | 50% | Attn | 960×544 | Fast sanity check |
+| **EXP-2** | `skye_exp2_standard.yaml` | 32 | 5000 | 50% | Attn | 960×544 | **Primary T2V** |
+| **EXP-2-10K** | `skye_exp2_10k.yaml` | 32 | 10000 | 50% | Attn | 960×544 | Extended main if underfitting |
+| **EXP-3** | `skye_exp3_highcap.yaml` | 32 | 15000 | 50% | Attn + FFN | 960×544 | Contingency — motion capacity |
+| **EXP-3-Highres** | `skye_exp3_highres.yaml` | 32 | 15000 | 50% | Attn + FFN | 768×1024 | Portrait T2V + fine detail |
+| **EXP-4** | `skye_exp4_i2v.yaml` | 32 | 2500 | **80%** | Attn | 960×544 | I2V production baseline |
+| **EXP-4-10K** | `skye_exp4_10k.yaml` | 32 | 10000 | **80%** | Attn | 960×544 | Extended I2V if underfitting |
+| **EXP-4-Highres** ⭐ | `skye_exp4_highres.yaml` | 32 | 15000 | **80%** | Attn + FFN | **768×1024** | **Primary: portrait I2V + fine detail** |
+
+> **Attn** = `to_k, to_q, to_v, to_out.0` · **FFN** = adds `ff.net.0.proj, ff.net.2, audio_ff.net.0.proj, audio_ff.net.2`
+
+---
+
 ### Step 0 — Preprocessing (tonight, ~3–4 hrs, runs once)
 
 ```bash
@@ -178,7 +196,7 @@ training_strategy:
 
 **Run on Machine 2 (second server, same preprocessed data copied over).**
 
-**Decision at step 1000:** Does validation video continue motion naturally from the start frame? If yes, extend to 5000 steps.
+**Decision at step 1000:** Does validation video continue motion naturally from the start frame? If yes, extend to EXP-4-10K (fresh run, 10000 steps). For the highest-quality production result, graduate to EXP-4-Highres (portrait resolution + FFN, 15000 steps).
 
 ---
 
@@ -199,15 +217,107 @@ optimization:
 
 **Checkpoints saved every 250 steps** — evaluate with `run_skye_like_api.py` at steps 1000, 2500, 5000.
 
-**Decision at step 2500:** If loss is still falling and validation shows clear improvement → extend to 10,000 steps on the same run (just update `steps` in config and continue from checkpoint).
+**Decision at step 2500:** If loss is still falling and validation shows clear improvement → launch EXP-2-10K as a fresh run (don't continue from checkpoint — full LR schedule).
 
 ---
 
-### EXP-3 — High Capacity (rank 32 + FFN, 3000 steps) — contingency only
+### EXP-2-10K — Extended Main (rank 32, 10000 steps)
 
-**Run only if EXP-2 looks generic at step 2500.** Adds feed-forward layers (the "motion memory") to the LoRA targets.
+**When to run:** EXP-2 at step 5000 still shows improvement (loss still falling, character not yet fully converged). This is a **fresh run**, not a continuation — the linear LR schedule restarts from 1e-4 → 0 over 10000 steps, giving the model the full curve.
+
+**Why fresh vs. continue:** Resuming from a 5000-step checkpoint would restart LR mid-schedule at a near-zero value, collapsing the remaining learning signal. Fresh run = ~24 epochs with 111 clips (closer to tutorial's ~263 exposures with 19 clips).
+
+**Config:** [packages/ltx-trainer/configs/skye_exp2_10k.yaml](packages/ltx-trainer/configs/skye_exp2_10k.yaml)
+
+```yaml
+lora:
+  rank: 32
+  alpha: 32
+  target_modules: [to_k, to_q, to_v, to_out.0]
+optimization:
+  steps: 10000
+  learning_rate: 1e-4
+```
+
+**Checkpoints every 500 steps** — 20 total checkpoints. Evaluate with `run_skye_benchmark.py` to compare across all checkpoints automatically.
+
+---
+
+### EXP-3 — High Capacity (rank 32 + FFN, 15000 steps) — contingency only
+
+**Run only if EXP-2 looks generic at step 2500.** Adds feed-forward layers (the "motion memory") to the LoRA targets. FFN layers store motion associations like "when Skye tilts her head, her ear flops like this."
 
 **Config:** [packages/ltx-trainer/configs/skye_exp3_highcap.yaml](packages/ltx-trainer/configs/skye_exp3_highcap.yaml)
+
+---
+
+### EXP-3-Highres — Portrait T2V + FFN (rank 32, 15000 steps)
+
+**Why:** Counterpart to EXP-4-Highres for text-to-video (no start frame). Source clips are close-up portrait/square shots — training at landscape 960×544 squishes Skye and crops her head/neck. Portrait 768×1024 lets her face fill the frame, giving the VAE more latent tokens for fine detail (collar tag, facial expressions). FFN layers added for fine texture and character style.
+
+**Config:** [packages/ltx-trainer/configs/skye_exp3_highres.yaml](packages/ltx-trainer/configs/skye_exp3_highres.yaml)
+
+```yaml
+lora:
+  rank: 32
+  target_modules: [to_k, to_q, to_v, to_out.0, ff.net.0.proj, ff.net.2, audio_ff.net.0.proj, audio_ff.net.2]
+training_strategy:
+  first_frame_conditioning_p: 0.5   # balanced T2V/I2V
+optimization:
+  steps: 15000
+data:
+  preprocessed_data_root: /home/efrattaig/data/golden_skye_preprocessed_768x1024
+```
+
+**Recommended:** Run with 2-GPU DDP. Run after or in parallel with EXP-4-Highres.
+
+---
+
+### EXP-4-Highres — Portrait I2V + FFN (rank 32, 15000 steps) ⭐ Primary High-Res
+
+**Why this is the target experiment:** Three improvements over EXP-4:
+1. **768×1024 portrait resolution** — matches the source clip aspect ratio; Skye's face fills the frame
+2. **FFN layers** — captures fine character texture, micro-expressions, and motion style
+3. **15000 steps** — matches EXP-3-Highres for fair comparison; ~36 epochs with 111 clips
+
+This is the most production-relevant experiment: optimized for the birthday video workflow (provide a Skye portrait → animate her with dialogue), with maximum detail fidelity.
+
+**Config:** [packages/ltx-trainer/configs/skye_exp4_highres.yaml](packages/ltx-trainer/configs/skye_exp4_highres.yaml)
+
+```yaml
+lora:
+  rank: 32
+  target_modules: [to_k, to_q, to_v, to_out.0, ff.net.0.proj, ff.net.2, audio_ff.net.0.proj, audio_ff.net.2]
+training_strategy:
+  first_frame_conditioning_p: 0.8   # HIGH I2V — 80% of steps use conditioning start frame
+optimization:
+  steps: 15000
+data:
+  preprocessed_data_root: /home/efrattaig/data/golden_skye_preprocessed_768x1024
+```
+
+**Recommended:** Run with 2-GPU DDP. W&B tags: `exp4-highres`, `portrait`, `768x1024`.
+
+---
+
+### EXP-4-10K — Extended I2V (rank 32, 10000 steps)
+
+**When to run:** EXP-4 at step 2500 underfitting — only ~6 epochs with 111 clips is insufficient. This is a **fresh run** (not a continuation) giving 10000 steps ≈ 24 epochs, matching EXP-2-10K scale.
+
+**Config:** [packages/ltx-trainer/configs/skye_exp4_10k.yaml](packages/ltx-trainer/configs/skye_exp4_10k.yaml)
+
+```yaml
+lora:
+  rank: 32
+  target_modules: [to_k, to_q, to_v, to_out.0]
+training_strategy:
+  first_frame_conditioning_p: 0.8   # HIGH I2V
+optimization:
+  steps: 10000
+  learning_rate: 1e-4
+```
+
+**Checkpoints every 500 steps** — 20 total. Use `run_skye_benchmark.py` for automated evaluation across all checkpoints.
 
 ---
 
