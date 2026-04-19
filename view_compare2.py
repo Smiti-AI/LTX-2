@@ -2,8 +2,19 @@
 """
 view_compare2.py
 
-Focused 2-checkpoint comparison gallery.
-Pick any two experiment+step combos; all scene videos play in perfect sync.
+Clean 2-checkpoint comparison: one scene per row, two columns, all synced.
+
+Sync model
+----------
+  Video[0] (top-left) is the MASTER.
+  All others are FOLLOWERS — synced to master via timeupdate + drift correction.
+  Clicking any video, or the transport buttons, controls the master.
+  A shared scrub bar + time display at the top.
+
+Audio
+-----
+  Videos are served with audio. Only the master plays audio (others are muted)
+  so you hear one clean audio track, not a chorus.
 
 Usage
 -----
@@ -45,6 +56,7 @@ EXP_LABELS = {
     "skye_exp4_i2v":      "EXP-4  I2V  (rank 32, 2.5k steps)",
     "skye_exp4_10k":      "EXP-4-10K  I2V  (rank 32, 10k steps)",
 }
+# EXP-3 (highcap / highres) was never run — no data exists for it.
 
 
 def discover() -> dict:
@@ -78,55 +90,56 @@ HTML = r"""<!DOCTYPE html>
 body { background: #0a0a0a; color: #ddd; font-family: system-ui, sans-serif; }
 
 /* ── header ── */
-.header { padding: 18px 24px 14px; border-bottom: 1px solid #1a1a1a;
-          display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
-.header h1 { font-size: 16px; color: #fff; white-space: nowrap; }
+.header { padding: 16px 20px 12px; border-bottom: 1px solid #1a1a1a;
+          display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+h1 { font-size: 15px; color: #fff; white-space: nowrap; }
 
-.picker { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.picker-block { display: flex; flex-direction: column; gap: 4px; }
-.picker-block label { font-size: 11px; color: #555; text-transform: uppercase; letter-spacing: .05em; }
-.picker-block select { background: #161616; color: #ccc; border: 1px solid #2a2a2a;
-  border-radius: 8px; padding: 7px 10px; font-size: 13px; min-width: 220px; cursor: pointer; }
-.vs { font-size: 20px; color: #333; font-weight: 700; padding-top: 18px; }
+.picker { display: flex; align-items: center; gap: 10px; }
+.picker-block { display: flex; flex-direction: column; gap: 3px; }
+.picker-block label { font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: .05em; }
+.picker-block select { background: #161616; color: #ccc; border: 1px solid #282828;
+  border-radius: 7px; padding: 6px 10px; font-size: 12px; min-width: 200px; cursor: pointer; }
+.vs { font-size: 18px; color: #333; font-weight: 700; padding-top: 16px; }
 
-.transport { display: flex; gap: 8px; align-items: center; margin-left: auto; }
-.btn { cursor: pointer; padding: 8px 18px; border-radius: 8px; border: none; font-size: 13px;
-       font-weight: 600; transition: background .15s; }
-.btn-play   { background: #2563eb; color: #fff; }
+/* ── transport bar ── */
+.transport { background: #111; border-bottom: 1px solid #1a1a1a;
+             padding: 8px 20px; display: flex; align-items: center; gap: 12px; }
+.btn { cursor: pointer; padding: 6px 16px; border-radius: 7px; border: none;
+       font-size: 12px; font-weight: 600; letter-spacing: .02em; }
+.btn-play    { background: #2563eb; color: #fff; }
 .btn-play:hover { background: #1d4ed8; }
-.btn-pause  { background: #1e1e1e; color: #aaa; border: 1px solid #2a2a2a; }
-.btn-pause:hover { background: #252525; }
-.btn-restart{ background: #1e1e1e; color: #aaa; border: 1px solid #2a2a2a; }
-.btn-restart:hover { background: #252525; }
+.btn-pause   { background: #1e1e1e; color: #aaa; border: 1px solid #2a2a2a; }
+.btn-restart { background: #1e1e1e; color: #aaa; border: 1px solid #2a2a2a; }
+.btn-pause:hover, .btn-restart:hover { background: #252525; }
+
+.progress-wrap { flex: 1; display: flex; align-items: center; gap: 8px; }
+#progress { flex: 1; accent-color: #2563eb; cursor: pointer; height: 4px; }
+#time-disp { font-size: 11px; color: #555; min-width: 40px; text-align: right; font-variant-numeric: tabular-nums; }
+#status { font-size: 11px; color: #c0392b; min-width: 180px; }
 
 /* ── column headers ── */
-.col-headers { display: grid; grid-template-columns: 140px 1fr 1fr;
-               gap: 0; border-bottom: 2px solid #1a1a1a; }
-.col-hdr { padding: 10px 12px; font-size: 13px; font-weight: 600; text-align: center;
-           background: #111; }
-.col-hdr.left  { color: #60a5fa; border-left: 3px solid #2563eb; }
-.col-hdr.right { color: #fb923c; border-left: 3px solid #ea580c; }
-.col-hdr.scene-hdr { color: #444; font-size: 11px; text-transform: uppercase;
-                     letter-spacing: .06em; text-align: left; }
+.col-headers { display: grid; grid-template-columns: 120px 1fr 1fr; }
+.chdr { padding: 9px 12px 7px; font-size: 12px; font-weight: 600; text-align: center;
+        background: #0f0f0f; border-bottom: 2px solid #1a1a1a; }
+.chdr.left  { color: #60a5fa; border-left: 3px solid #2563eb; }
+.chdr.right { color: #fb923c; border-left: 3px solid #ea580c; }
+.chdr.scene-hdr { color: #333; font-size: 10px; text-transform: uppercase; letter-spacing: .07em;
+                  text-align: left; }
 
 /* ── rows ── */
-.scene-row { display: grid; grid-template-columns: 140px 1fr 1fr;
+.scene-row { display: grid; grid-template-columns: 120px 1fr 1fr;
              border-bottom: 1px solid #111; }
-.scene-row:hover { background: #0e0e0e; }
-.scene-label { padding: 0 12px; display: flex; align-items: center;
-               font-size: 13px; color: #888; font-weight: 500; }
-.scene-label .overfit-tag { font-size: 10px; color: #333; display: block; margin-top: 2px; }
+.scene-row:hover { background: #0d0d0d; }
+.scene-lbl { display: flex; align-items: center; padding: 0 10px;
+             font-size: 12px; color: #777; font-weight: 500; }
 
-.video-cell { padding: 8px 10px; }
-video { width: 100%; border-radius: 8px; background: #000; display: block;
-        cursor: pointer; outline: none; }
-video:hover { box-shadow: 0 0 0 2px #2563eb44; }
-.left-cell  video { border-top: 3px solid #2563eb22; }
-.right-cell video { border-top: 3px solid #ea580c22; }
+.vcell { padding: 6px 8px; }
+video { width: 100%; border-radius: 7px; background: #000; display: block; cursor: pointer; }
+video.master { border-top: 3px solid #2563eb55; }
+.vcell.right video { border-top: 3px solid #ea580c55; }
 
-.section-divider { grid-column: 1/-1; background: #111;
-  font-size: 10px; color: #333; text-transform: uppercase; letter-spacing: .08em;
-  padding: 5px 14px; }
+.section-sep { grid-column: 1/-1; background: #0f0f0f; color: #2a2a2a;
+  font-size: 10px; text-transform: uppercase; letter-spacing: .07em; padding: 5px 14px; }
 </style>
 </head>
 <body>
@@ -144,17 +157,23 @@ video:hover { box-shadow: 0 0 0 2px #2563eb44; }
       <select id="sel-right"></select>
     </div>
   </div>
-  <div class="transport">
-    <button class="btn btn-restart" onclick="restartAll()">↺ Restart</button>
-    <button class="btn btn-pause"   onclick="pauseAll()">⏸ Pause</button>
-    <button class="btn btn-play"    onclick="playAll()">▶ Play all</button>
+</div>
+
+<div class="transport">
+  <button class="btn btn-restart" onclick="restart()">↺ Restart</button>
+  <button class="btn btn-pause"   onclick="pause()">⏸ Pause</button>
+  <button class="btn btn-play"    onclick="play()">▶ Play all</button>
+  <div class="progress-wrap">
+    <input type="range" id="progress" min="0" max="1000" value="0">
+    <span id="time-disp">0.0 s</span>
   </div>
+  <span id="status"></span>
 </div>
 
 <div class="col-headers">
-  <div class="col-hdr scene-hdr">Scene</div>
-  <div class="col-hdr left"  id="hdr-left">—</div>
-  <div class="col-hdr right" id="hdr-right">—</div>
+  <div class="chdr scene-hdr">Scene</div>
+  <div class="chdr left"  id="hdr-left">—</div>
+  <div class="chdr right" id="hdr-right">—</div>
 </div>
 
 <div id="rows"></div>
@@ -166,115 +185,131 @@ const SCENE_ORDER = __SCENE_ORDER__;
 const SCENE_LABELS= __SCENE_LABELS__;
 const MAIN_SCENES = ["bey","crsms","holoween","party","snow"];
 
-// Build flat list of options: [{exp, step, label}]
+// ── Options list ─────────────────────────────────────────────────────────────
 const OPTIONS = [];
 Object.entries(DATA).forEach(([exp, steps]) => {
-  const expLabel = EXP_LABELS[exp] || exp;
-  Object.keys(steps).map(Number).sort((a,b)=>a-b).forEach(step => {
-    OPTIONS.push({ exp, step, label: `${expLabel}  —  step ${step.toLocaleString()}` });
-  });
+    const label = EXP_LABELS[exp] || exp;
+    Object.keys(steps).map(Number).sort((a,b)=>a-b).forEach(step => {
+        OPTIONS.push({ exp, step, label: `${label}  —  step ${step.toLocaleString()}` });
+    });
 });
 
-function populateSelect(selId, defaultExp, defaultStep) {
-  const sel = document.getElementById(selId);
-  OPTIONS.forEach((o, i) => {
-    const opt = document.createElement('option');
-    opt.value = i;
-    opt.textContent = o.label;
-    if (o.exp === defaultExp && o.step === defaultStep) opt.selected = true;
-    sel.appendChild(opt);
-  });
-  sel.addEventListener('change', render);
+function populateSelect(id, defExp, defStep) {
+    const sel = document.getElementById(id);
+    OPTIONS.forEach((o, i) => {
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = o.label;
+        if (o.exp === defExp && o.step === defStep) opt.selected = true;
+        sel.appendChild(opt);
+    });
+    sel.addEventListener('change', render);
 }
+populateSelect('sel-left',  'skye_exp2_10k', 5000);
+populateSelect('sel-right', 'skye_exp2_10k', 10000);
 
-// Default: exp2_10k step 5000 vs step 10000
-const defExp = 'skye_exp2_10k';
-populateSelect('sel-left',  defExp, 5000);
-populateSelect('sel-right', defExp, 10000);
+// ── Master-follower sync ──────────────────────────────────────────────────────
+let master = null;
+const status = document.getElementById('status');
+const progress = document.getElementById('progress');
+const timeDisp = document.getElementById('time-disp');
 
-// ── Sync engine ─────────────────────────────────────────────────────────────
-let syncing = false;
-
-function allVideos() { return [...document.querySelectorAll('video')]; }
+function followers() {
+    const all = [...document.querySelectorAll('video')];
+    return all.filter(v => v !== master);
+}
+function allVids() { return [...document.querySelectorAll('video')]; }
 
 function attachSync() {
-  allVideos().forEach(v => {
-    v.onplay = () => {
-      if (syncing) return; syncing = true;
-      allVideos().filter(x=>x!==v).forEach(x => {
-        x.currentTime = v.currentTime; x.play().catch(()=>{});
-      });
-      syncing = false;
-    };
-    v.onpause = () => {
-      if (syncing) return; syncing = true;
-      allVideos().filter(x=>x!==v).forEach(x => x.pause());
-      syncing = false;
-    };
-    v.onseeked = () => {
-      if (syncing) return; syncing = true;
-      allVideos().filter(x=>x!==v).forEach(x => { x.currentTime = v.currentTime; });
-      syncing = false;
-    };
-  });
+    const vs = allVids();
+    if (!vs.length) { status.textContent = 'No videos found'; return; }
+
+    master = vs[0];
+    master.classList.add('master');
+    status.textContent = '';
+
+    // Master drives followers
+    master.addEventListener('timeupdate', () => {
+        const t = master.currentTime;
+        // Update scrub bar
+        if (master.duration) {
+            progress.value = Math.round((t / master.duration) * 1000);
+            timeDisp.textContent = t.toFixed(1) + ' s';
+        }
+        // Sync followers (correct drift > 0.15s)
+        followers().forEach(v => {
+            if (Math.abs(v.currentTime - t) > 0.15) v.currentTime = t;
+        });
+    });
+
+    master.addEventListener('play',  () => followers().forEach(v => v.play().catch(()=>{})));
+    master.addEventListener('pause', () => followers().forEach(v => v.pause()));
+    master.addEventListener('ended', () => followers().forEach(v => v.pause()));
+
+    master.addEventListener('error', e => {
+        status.textContent = 'Error loading master video: ' + (master.error?.message || '?');
+    });
+
+    // Scrub bar seeks all videos
+    progress.addEventListener('input', () => {
+        if (!master.duration) return;
+        const t = (progress.value / 1000) * master.duration;
+        allVids().forEach(v => { v.currentTime = t; });
+        timeDisp.textContent = t.toFixed(1) + ' s';
+    });
+
+    // Click any video = toggle play/pause via master
+    allVids().forEach(v => {
+        v.addEventListener('click', () => {
+            if (master.paused) master.play().catch(err => { status.textContent = '▶ failed: ' + err.message; });
+            else master.pause();
+        });
+    });
 }
 
-function playAll() {
-  const vs = allVideos(); if (!vs.length) return;
-  syncing = true;
-  vs.forEach(v => { v.currentTime = vs[0].currentTime; v.play().catch(()=>{}); });
-  syncing = false;
+function play() {
+    if (!master) { status.textContent = 'No videos loaded yet'; return; }
+    master.currentTime = 0;
+    const p = master.play();
+    if (p) p.catch(err => { status.textContent = '▶ failed: ' + err.message; });
 }
-function pauseAll()   { allVideos().forEach(v => v.pause()); }
-function restartAll() {
-  syncing = true;
-  allVideos().forEach(v => { v.currentTime = 0; v.pause(); });
-  syncing = false;
-  setTimeout(() => allVideos().forEach(v => v.play().catch(()=>{})), 50);
-}
+function pause()   { if (master) master.pause(); }
+function restart() { play(); }
 
 // ── Render ───────────────────────────────────────────────────────────────────
 function render() {
-  const leftOpt  = OPTIONS[document.getElementById('sel-left').value];
-  const rightOpt = OPTIONS[document.getElementById('sel-right').value];
+    const lo = OPTIONS[document.getElementById('sel-left').value];
+    const ro = OPTIONS[document.getElementById('sel-right').value];
 
-  document.getElementById('hdr-left').textContent  = leftOpt.label;
-  document.getElementById('hdr-right').textContent = rightOpt.label;
+    document.getElementById('hdr-left').textContent  = lo.label;
+    document.getElementById('hdr-right').textContent = ro.label;
 
-  const leftScenes  = DATA[leftOpt.exp]?.[leftOpt.step]  || {};
-  const rightScenes = DATA[rightOpt.exp]?.[rightOpt.step] || {};
+    const lScenes = DATA[lo.exp]?.[String(lo.step)] || {};
+    const rScenes = DATA[ro.exp]?.[String(ro.step)] || {};
 
-  let html = '';
-  let inOverfit = false;
+    let html = '';
+    let overfit = false;
+    SCENE_ORDER.forEach(scene => {
+        if (!MAIN_SCENES.includes(scene) && !overfit) {
+            overfit = true;
+            html += '<div class="scene-row"><div class="section-sep">Overfit / training-data scenes</div></div>';
+        }
+        const ls = lScenes[scene], rs = rScenes[scene];
+        html += `<div class="scene-row">`;
+        html += `<div class="scene-lbl">${SCENE_LABELS[scene] || scene}</div>`;
+        html += `<div class="vcell left">`  + (ls ? `<video src="/${ls}" preload="auto" playsinline></video>` : '<div style="color:#222;padding:20px;text-align:center">—</div>') + `</div>`;
+        html += `<div class="vcell right">` + (rs ? `<video src="/${rs}" preload="auto" muted playsinline></video>` : '<div style="color:#222;padding:20px;text-align:center">—</div>') + `</div>`;
+        html += `</div>`;
+    });
 
-  SCENE_ORDER.forEach(scene => {
-    const isOverfit = !MAIN_SCENES.includes(scene);
-    if (isOverfit && !inOverfit) {
-      inOverfit = true;
-      html += `<div class="scene-row"><div class="section-divider">Overfit / training-data scenes</div></div>`;
-    }
+    document.getElementById('rows').innerHTML = html;
 
-    const leftSrc  = leftScenes[scene];
-    const rightSrc = rightScenes[scene];
+    // Reset scrub bar
+    progress.value = 0;
+    timeDisp.textContent = '0.0 s';
+    master = null;
 
-    html += `<div class="scene-row">`;
-    html += `<div class="scene-label">${SCENE_LABELS[scene]||scene}</div>`;
-
-    html += `<div class="video-cell left-cell">`;
-    if (leftSrc) html += `<video src="/${leftSrc}" preload="auto" muted playsinline></video>`;
-    else         html += `<div style="color:#333;padding:20px;text-align:center">—</div>`;
-    html += `</div>`;
-
-    html += `<div class="video-cell right-cell">`;
-    if (rightSrc) html += `<video src="/${rightSrc}" preload="auto" muted playsinline></video>`;
-    else          html += `<div style="color:#333;padding:20px;text-align:center">—</div>`;
-    html += `</div>`;
-
-    html += `</div>`;
-  });
-
-  document.getElementById('rows').innerHTML = html;
-  attachSync();
+    attachSync();
 }
 
 render();
@@ -309,7 +344,6 @@ def main() -> None:
     args = parser.parse_args()
 
     data = discover()
-    # Stringify int step keys for JSON
     data_js = {
         exp: {str(step): scenes for step, scenes in steps.items()}
         for exp, steps in data.items()
@@ -326,7 +360,8 @@ def main() -> None:
     handler = functools.partial(Handler, page_html=page_html)
     server  = http.server.HTTPServer(("127.0.0.1", args.port), handler)
     print(f"Gallery: http://127.0.0.1:{args.port}")
-    print("Defaults to EXP-2-10K  step 5,000  vs  step 10,000")
+    print("Defaults: EXP-2-10K step 5,000 (left, with audio) vs step 10,000 (right, muted)")
+    print("Note: EXP-3 was never run — no data exists for it.")
     print("Press Ctrl+C to stop.\n")
     threading.Timer(0.4, lambda: webbrowser.open(f"http://127.0.0.1:{args.port}")).start()
     server.serve_forever()
