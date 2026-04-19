@@ -64,6 +64,7 @@ def make_preview(clips: list[tuple[str, str]], width: int, height: int, output_p
                 "-vf", vf,
                 "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "23", "-preset", "fast",
                 "-an",
+                "-avoid_negative_ts", "make_zero",  # prevent B-frame DTS issues in concat
                 "-t", "6",   # cap each clip at 6s so preview doesn't get too long
                 str(out_clip),
             ]
