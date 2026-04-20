@@ -74,7 +74,7 @@ validation:
   stg_blocks: [29]
   stg_mode: "stg_av"
   generate_audio: true
-  skip_initial_validation: false
+  skip_initial_validation: true
 
 checkpoints:
   interval: 500
