@@ -1,0 +1,113 @@
+# =============================================================================
+# PAW Patrol S01E03A LoRA — EXP-1: rank 32 + FFN, 960×544, 10k steps
+# =============================================================================
+#
+# First PAW Patrol LoRA experiment trained on Season 1 Episode 3 Part A.
+# Same architecture as Chase EXP-1 / Skye EXP-3-highcap:
+#   - Rank 32, Attn + FFN layers
+#   - 50% I2V conditioning
+#   - 10k steps
+#
+# Resolution: 960×544 (standard 16:9 for PAW Patrol animated content)
+#
+# Training data: scenes from PawPatrol_S01_E03_A.mp4,
+#   preprocessed at 960×544×49 and 960×544×97 buckets.
+#
+# Run on A100 (35.238.2.51):
+#   cd ~/LTX-2
+#   nohup env PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
+#     ~/.local/bin/uv run python packages/ltx-trainer/scripts/train.py \
+#     packages/ltx-trainer/configs/paw_patrol_s01e03a_exp1.yaml \
+#     2>&1 | tee /tmp/ltx_current.log &
+# =============================================================================
+
+model:
+  model_path: "/home/efrattaig/models/LTX-2.3/ltx-2.3-22b-dev.safetensors"
+  text_encoder_path: "/home/efrattaig/models/gemma-3-12b-it-qat-q4_0-unquantized"
+  training_mode: "lora"
+  load_checkpoint: null
+
+lora:
+  rank: 32
+  alpha: 32
+  dropout: 0.0
+  target_modules:
+    # Attention layers
+    - "to_k"
+    - "to_q"
+    - "to_v"
+    - "to_out.0"
+    # Feed-forward layers — character texture / motion style capacity
+    - "ff.net.0.proj"
+    - "ff.net.2"
+    - "audio_ff.net.0.proj"
+    - "audio_ff.net.2"
+
+training_strategy:
+  name: "text_to_video"
+  first_frame_conditioning_p: 0.5   # 50% I2V
+  with_audio: true
+  audio_latents_dir: "audio_latents"
+
+optimization:
+  learning_rate: 1e-4
+  steps: 10000
+  batch_size: 1
+  gradient_accumulation_steps: 1
+  max_grad_norm: 1.0
+  optimizer_type: "adamw"
+  scheduler_type: "linear"
+  scheduler_params: {}
+  enable_gradient_checkpointing: true
+
+acceleration:
+  mixed_precision_mode: "bf16"
+  quantization: null
+  load_text_encoder_in_8bit: true
+
+data:
+  preprocessed_data_root: "/home/efrattaig/data/PawPatrol_S01_E03_A"
+  num_dataloader_workers: 2
+
+validation:
+  prompts:
+    - "PAW Patrol pups gathered at the Lookout tower in Adventure Bay. Ryder stands with Chase, Skye, Marshall, Rocky, Rubble, and Zuma, all in their PAW Patrol uniforms. Ryder says 'PAW Patrol, let's go!' The audio captures his confident voice and the pups' excited barks."
+    - "Chase the German Shepherd pup and Skye the Cockapoo run side by side across a sunny field in Adventure Bay. Chase says 'We're on the case!' while Skye calls 'I'm on it!' Both are wearing their PAW Patrol uniforms. The audio has their enthusiastic voices and paws on the ground."
+    - "Ryder rides his ATV through Adventure Bay, followed by Marshall's fire truck and Chase's police cruiser. The convoy races toward the bay as Ryder says 'No job is too big, no pup is too small!' The audio captures the engines revving and Ryder's rallying call."
+  images: null
+  negative_prompt: "worst quality, inconsistent motion, blurry, jittery, distorted"
+  video_dims: [960, 544, 49]   # 2s validation clips at 24fps
+  frame_rate: 24.0
+  seed: 42
+  inference_steps: 30
+  interval: 500
+  videos_per_prompt: 1
+  guidance_scale: 4.0
+  stg_scale: 1.0
+  stg_blocks: [29]
+  stg_mode: "stg_av"
+  generate_audio: true
+  skip_initial_validation: true   # Avoid OOM if benchmark is still running at start
+
+checkpoints:
+  interval: 500
+  keep_last_n: 0  # Keep all — needed to benchmark full training curve
+  precision: "bfloat16"
+
+flow_matching:
+  timestep_sampling_mode: "shifted_logit_normal"
+  timestep_sampling_params: {}
+
+hub:
+  push_to_hub: false
+  hub_model_id: null
+
+wandb:
+  enabled: true
+  project: "ltx-2-paw-patrol-lora"
+  entity: null
+  tags: ["ltx2", "lora", "paw-patrol", "s01e03a", "exp1", "960x544", "rank32"]
+  log_validation_videos: true
+
+seed: 42
+output_dir: "outputs/paw_patrol_s01e03a_exp1"
