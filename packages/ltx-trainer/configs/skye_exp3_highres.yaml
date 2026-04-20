@@ -1,5 +1,5 @@
 # =============================================================================
-# Skye LoRA — EXP3_highres: Portrait 768×1024 + T2V + FFN (15000 steps)
+# Skye LoRA — EXP3_highres: Portrait 768×1024 + T2V + FFN (10000 steps)
 # =============================================================================
 #
 # Text-to-video counterpart to EXP4_highres — no start frame required.
@@ -44,7 +44,7 @@ training_strategy:
 
 optimization:
   learning_rate: 1e-4
-  steps: 15000
+  steps: 10000
   batch_size: 1
   gradient_accumulation_steps: 1
   max_grad_norm: 1.0
