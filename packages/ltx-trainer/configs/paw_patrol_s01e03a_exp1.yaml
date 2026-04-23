@@ -25,7 +25,7 @@ model:
   model_path: "/home/efrattaig/models/LTX-2.3/ltx-2.3-22b-dev.safetensors"
   text_encoder_path: "/home/efrattaig/models/gemma-3-12b-it-qat-q4_0-unquantized"
   training_mode: "lora"
-  load_checkpoint: null
+  load_checkpoint: "/home/efrattaig/LTX-2/outputs/paw_patrol_s01e03a_exp1/checkpoints/lora_weights_step_02000.safetensors"
 
 lora:
   rank: 32
