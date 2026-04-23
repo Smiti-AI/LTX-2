@@ -67,6 +67,7 @@ SKYE_W,  SKYE_H  = 768, 1024
 
 _ANTI_SUBTITLE = (
     ", subtitles, captions, on-screen text, text overlay, burned-in text, watermark"
+    ", text, letters, alphabet, words"
 )
 _ANTI_TRANSITION = (
     ", scene change, environment change, transition, cut to new location, "
