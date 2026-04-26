@@ -269,8 +269,41 @@ After IPs are provided, no further user action required until results are in (~1
 
 ### Outstanding work (queued)
 - **Phase 2 curriculum** (10k steps on full 472 re-captioned dataset) — launches when Phase 1 finishes
-- **Rank 128 ablation** — launches on 34.56.137.11 when goldenPLUS150 benchmark finishes there (~30 min)
-- **Rsync benchmark results to local** — when each benchmark completes
+
+### 2026-04-26 — Both benchmarks DONE ✅
+- **goldenPLUS150 benchmark (34.56.137.11)**: 35/35 LoRA comparisons + 7 base videos. Rsync'd to `/Users/efrattaig/projects/sm/LTX-2/lora_results/goldenPlus150_version1/` (77 mp4 files locally)
+- **full_cast_exp1_season1 benchmark (35.225.196.76)**: 28/28 LoRA comparisons + 7 base videos. Rsync'd to `/Users/efrattaig/projects/sm/LTX-2/lora_results/full_episods/` (64 mp4 files locally)
+
+### 2026-04-26 — Rank-128 ablation LAUNCHED on 34.56.137.11 ✅
+- Initial attempt loaded rank-32 baseline weights → shape mismatch (rank-128 LoRA params ≠ rank-32 LoRA params).
+- Updated config to `load_checkpoint: null` — rank-128 trains from scratch. This is the *correct* setup for an ablation isolating capacity (no warm-start advantage).
+- W&B run: [kjy9r8wq](https://wandb.ai/shayzweig-smiti-ai/LTX2_lora/runs/kjy9r8wq)
+- **1.23 BILLION trainable params** (vs 308M for rank-32). 4× capacity.
+- Dataset: full 472 re-captioned (the new conditions were rsync'd from 34.61.89.219 first; 136 generic-caption .pt backed up to `conditions_v1_generic_backup/`)
+- 10k steps, ETA ~12-15 hours
+
+### 2026-04-26 — Chase + Skye character benchmarks complete (goldenPLUS150)
+- Chase benchmark: 5 scenes × 5 checkpoints + 5 base = 30 generations on 35.225.196.76
+- Skye benchmark first attempt failed: needed `inputs/overfit_bm/` images for the 5 "of_*" scenes; rsync'd from local + relaunched
+- Skye now running 10 scenes × 5 checkpoints + 10 base = 60 generations (~1 hr)
+- Output paths:
+  - Chase: `lora_results/chase_lora/benchmarks/`
+  - Skye: `output/benchmarks/` (different default in skye script)
+
+### 2026-04-26 — 3-way comparison viewer plan
+- User wants every scene to show **3 results: 150 / episode / base** with VLM analysis (cheap = Flash mode)
+  - **150** = goldenPLUS150 LoRA (using cumulative step 10000 — diagnosed best, before low-σ overfitting)
+  - **episode** = full_cast_exp1_season1 LoRA (cumulative step 10000, final)
+  - **base** = LTX-2.3, no LoRA
+- Queued follow-up benchmark on 35.225.196.76 (auto-launches when current Skye finishes):
+  - Chase + Skye benchmarks on `outputs/full_cast_exp1_benchmark` exp dir, with `--steps 10000` so only the final cumulative checkpoint is rendered (saves time vs all 4)
+- Wrote `auto_val/build_phase4_viewer.py`:
+  - Loads scenes from BM_v1 (configs.json), chase_bm and sky_bm (BENCHMARK_SCENES from the .py scripts)
+  - For each scene, finds the 3 model videos
+  - Runs `vlm_pipeline.run --mode cheap` (Flash) on each → produces report.json with score/verdict/headline
+  - Writes per-scene `outputs_vlm_compare_phase4_<scene>/manifest.json` + viewer.html
+- Estimated cost: 17 scenes × 3 models × ~$0.10 = **~$5** for VLM analysis
+- Estimated time: ~30-45 min after all benchmarks finish
 
 ---
 
