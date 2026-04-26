@@ -224,32 +224,45 @@ def unload_model(obj) -> None:
 # ══════════════════════════════════════════════════════════════════════════════
 
 def precompute_embeddings(scenes: list[dict], device: str = "cuda") -> list[dict]:
-    """Load Gemma (8-bit), encode all prompts, return list of CachedPromptEmbeddings."""
+    """Load Gemma (8-bit) + embeddings processor, encode all prompts, return cached embeddings."""
     import torch
-    from ltx_trainer.model_loader import load_text_encoder
+    from ltx_trainer.model_loader import load_text_encoder, load_embeddings_processor
     from ltx_trainer.validation_sampler import CachedPromptEmbeddings
 
-    log.info("Loading text encoder (8-bit)...")
+    log.info("Loading text encoder (8-bit) + embeddings processor...")
     text_encoder = load_text_encoder(str(GEMMA_ROOT), device=device, load_in_8bit=True)
     text_encoder.eval()
+    embeddings_processor = load_embeddings_processor(
+        checkpoint_path=str(CHECKPOINT_PATH),
+        device=device,
+        dtype=torch.bfloat16,
+    )
 
     cached = []
     log.info(f"Encoding prompts for {len(scenes)} scenes...")
-    with torch.no_grad():
+    with torch.inference_mode():
         for scene in scenes:
             log.info(f"  Encoding: {scene['name']}")
-            # Full forward: returns (video_embeds, audio_embeds, attention_mask)
-            pos_v, pos_a, _ = text_encoder(scene["prompt"])
-            neg_v, neg_a, _ = text_encoder(scene.get("negative_prompt", NEGATIVE_PROMPT))
+            pos_hs, pos_mask = text_encoder.encode(scene["prompt"])
+            pos_out = embeddings_processor.process_hidden_states(pos_hs, pos_mask)
+
+            neg_hs, neg_mask = text_encoder.encode(scene.get("negative_prompt", NEGATIVE_PROMPT))
+            neg_out = embeddings_processor.process_hidden_states(neg_hs, neg_mask)
+
             cached.append(CachedPromptEmbeddings(
-                video_context_positive=pos_v.cpu(),
-                audio_context_positive=pos_a.cpu(),
-                video_context_negative=neg_v.cpu(),
-                audio_context_negative=neg_a.cpu(),
+                video_context_positive=pos_out.video_encoding.cpu(),
+                audio_context_positive=(
+                    pos_out.audio_encoding.cpu() if pos_out.audio_encoding is not None else None
+                ),
+                video_context_negative=neg_out.video_encoding.cpu(),
+                audio_context_negative=(
+                    neg_out.audio_encoding.cpu() if neg_out.audio_encoding is not None else None
+                ),
             ))
 
-    log.info("Unloading text encoder...")
+    log.info("Unloading text encoder + embeddings processor...")
     unload_model(text_encoder)
+    unload_model(embeddings_processor)
     return cached
 
 
