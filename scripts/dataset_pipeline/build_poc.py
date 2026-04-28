@@ -165,7 +165,6 @@ def build_skye(out_root: Path, limit: int) -> list[POCClip]:
             clip.height = meta.get("height", 0)
             clip.fps = meta.get("fps", 0.0)
             clip.video_md5 = md5_file(video_local)
-            (out_root / clip.prompt_path).write_text(caption + "\n")
             print(f"  [{i}] OK  {clip.width}x{clip.height}@{clip.fps:.2f} {clip.duration_s:.2f}s  "
                   f"src={url.split('/')[-1]}", flush=True)
         clips.append(clip)
@@ -215,7 +214,6 @@ def build_chase(out_root: Path, limit: int) -> list[POCClip]:
             clip.height = meta_v.get("height", 0)
             clip.fps = meta_v.get("fps", 0.0)
             clip.video_md5 = md5_file(video_local)
-            (out_root / clip.prompt_path).write_text(caption + "\n")
             print(f"  [{i}] OK  {clip.width}x{clip.height}@{clip.fps:.2f} {clip.duration_s:.2f}s  "
                   f"src={url.split('/')[-1]}", flush=True)
         clips.append(clip)
@@ -291,8 +289,8 @@ def main() -> int:
 
     for character, version, dataset_dir, source_label in targets:
         out_root = Path(args.local_out) / dataset_dir
-        for sub in ("videos", "prompts"):
-            (out_root / sub).mkdir(parents=True, exist_ok=True)
+        (out_root / "videos").mkdir(parents=True, exist_ok=True)
+        (out_root / "prompts").mkdir(parents=True, exist_ok=True)  # only for all.csv
         print(f"\n=== POC build: {dataset_dir} (limit={args.limit}) ===", flush=True)
         if character == "skye":
             clips = build_skye(out_root, args.limit)
