@@ -1,356 +1,229 @@
-# Training Data Pipeline — Rebuild Proposal
+# Training Data Pipeline — Implementation Reference
 
-> **Status:** proposal. Nothing executes until you greenlight.
-> **Principle:** clean rebuild over salvage. Anything we can't trivially verify, we regenerate from raw + manifests.
-
----
-
-## 1. Inputs (the only sources of truth from now on)
-
-| What | Where | Frozen? |
-|---|---|---|
-| Golden Set manifests | `gs://video_gen_dataset/dataset/labelbox/{chase,skye}_golden.json` (+ companion `.parquet` for tabular form) | yes — single source of clip-list + captions |
-| Raw broadcast episodes | `gs://video_gen_dataset/raw/paw_patrol/season_*/compressed_videos/PawPatrol_SXX_EYY_*.mp4` | yes — never edited |
-
-Everything outside these two paths is treated as *output of an old pipeline* and ignored.
+> **Status:** built and validated end-to-end (smoke train passed 2026-04-28).
+> **Single source of truth:** the per-character JSON manifest in
+> `gs://video_gen_dataset/dataset/labelbox/`. Captions resolved via the
+> matching `_filtered.parquet`. Everything else is derived.
 
 ---
 
-## 2. Canonical directory layout (per dataset)
+## 1. Inputs
+
+Two sources of truth, both in `gs://video_gen_dataset/`:
+
+| What | Where |
+|---|---|
+| Curation (which clips, in what order) | `dataset/labelbox/{chase_golden.json, skye_golden.json}` |
+| Captions (`scene_caption` per clip) | `dataset/labelbox/Project_Lipsync/Chase/chase_all_seasoned_results_filtered.parquet` (chase)<br>`dataset/labelbox/Project_Lipsync/Other/Golden_dataset/skye_all_seasons_results_filtered_augmented_no_text_train_*.parquet` (skye) |
+| Source clip mp4s | URLs inside the JSON (chase) or joined-via-aug-parquet for skye_v2 |
+| Brand-token map | `scripts/dataset_pipeline/brand_tokens.yaml` (configurable, applied just-in-time) |
+
+Everything else is reproducible.
+
+---
+
+## 2. Canonical layout per dataset
 
 ```
-gs://video_gen_dataset/training_data/{dataset_id}/
-    metadata.json                  ← master file, the only thing trainer + manage.py read
-    videos/
-        0001.mp4
-        0002.mp4
-        ...
-        0NNN.mp4                   ← clip filenames are zero-padded indices, never renumbered
-    prompts/
-        0001.txt                   ← one caption per clip, plain UTF-8
-        0002.txt
-        ...
-        all.csv                    ← rebuilt aggregate (index, prompt) for bulk view/edit
-    latents/
-        0001.pt                    ← preprocessed for the trainer
-        0002.pt
-        ...
-    gallery/
-        gallery.mp4                ← THE QC artifact (see §4)
-        per_clip/                  ← intermediate annotated clips (regeneration source for gallery)
-            0001.mp4
-            ...
-    audit/
-        build.log                  ← what ran, when, with which versions
-        deletions.log              ← every `manage.py delete` invocation appended here
+gs://video_gen_dataset/TinyStories/training_data/{dataset_id}/
+    metadata.json                                 ← canonical record (raw caps, status, md5, provenance)
+    source_gallery.mp4                            ← raw clips for visual context (full duration)
+    training_gallery.mp4                          ← what the model trains on (49-frame letterboxed)
+    videos/0001.mp4 … 000N.mp4                    ← raw downloads (variable resolution, full duration)
+    processed_videos/0001.mp4 … 000N.mp4          ← letterboxed to 960×544, trimmed to 49 frames
+    precomputed/
+        latents/videos/0001.pt … 000N.pt          ← VAE video latents (128×7×17×30, bf16)
+        conditions/videos/0001.pt … 000N.pt       ← Gemma text embeddings (1024×4096 + audio split)
 ```
 
-**`{dataset_id}` convention:** `{character_or_set}_golden_v{N}_{YYYYMMDD}`
-- `chase_golden_v1_20260428`
-- `skye_golden_v1_20260428`
-- `full_cast_v1_20260501` (later)
-
-Bumps `vN` only on a *full rebuild* (manifest changed, captioning re-done, encoding params changed). Deletions within a version stay in the same `vN` and gaps are kept (no renumbering).
+`{dataset_id}` convention: `{character}_golden_v{N}`. Currently:
+- `chase_golden_v1` — 605 clips from `chase_golden.json`
+- `skye_golden_v2` — 111 clips from `skye_golden.json` joined to the augmented parquet for live URLs (the v2 parquet's own URLs are stale — see §7)
 
 ---
 
-## 3. `metadata.json` schema
+## 3. `metadata.json` — what each field is
 
-The single load-bearing file. Trainer reads this; `manage.py` writes it.
-
-```json
+```jsonc
 {
-  "dataset_id": "chase_golden_v1_20260428",
+  "dataset_id": "chase_golden_v1",
   "character": "chase",
   "version": 1,
-  "created_at": "2026-04-28T18:00:00Z",
-  "git_commit": "abcdef12...",
-
+  "created_at": "2026-04-28T...",
   "source": {
-    "manifest": "gs://video_gen_dataset/dataset/labelbox/chase_golden.json",
-    "manifest_md5": "...",
+    "manifest_label": "chase_golden.json (URLs) + chase_all_seasoned_results_filtered.parquet (captions)",
     "raw_footage_root": "gs://video_gen_dataset/raw/paw_patrol/"
   },
-
-  "encoding": {
-    "resolution": [960, 544],
-    "fps": 24,
-    "frames_per_clip": 49,
-    "codec": "libx264",
-    "container": "mp4"
-  },
-
   "captioning": {
-    "source": "labelbox_manifest_field:caption",
     "version": "v1",
-    "brand_token_format": "CHASE_PP"
+    "brand_token_format": "raw character names; substitution applied just-in-time",
+    "substitution_at_build_time": false,
+    "substitution_config": "scripts/dataset_pipeline/brand_tokens.yaml"
   },
-
-  "stats": {
-    "active_clips": 137,
-    "deleted_clips": 13,
-    "total_duration_s": 274.0
-  },
-
+  "stats": { "active_clips": 605, "missing_clips": 0 },
   "clips": [
     {
       "index": 1,
-      "status": "active",                   // "active" | "deleted"
-      "source_episode": "PawPatrol_S01_E06_A",
-      "source_time_range_s": [120.5, 122.5],
-      "video": "videos/0001.mp4",
+      "status": "active",                           // active | deleted
+      "source_url": "gs://...../scene_84_..._output.mp4",
+      "source_episode": "PawPatrol_S01_E02_A",
+      "source_season": 1,
+      "source_scene_number": 84.0,
+      "speaker": "CHASE",
+      "video": "videos/0001.mp4",                   // raw download, relative to dataset root
       "video_md5": "...",
-      "prompt": "videos/0001.txt content here, mirrored for grep convenience",
-      "prompt_path": "prompts/0001.txt",
-      "latent_path": "latents/0001.pt",
-      "duration_s": 2.0,
-      "width": 960,
-      "height": 544,
-      "fps": 24
-    },
-    {
-      "index": 42,
-      "status": "deleted",
-      "deletion": {
-        "reason": "low quality, character off-model",
-        "deleted_at": "2026-04-30T12:34:00Z"
-      }
+      "prompt": "Chase, a happy animated dog, ...",  // RAW — no brand token here
+      "duration_s": 2.46, "width": 1252, "height": 1080, "fps": 24.0,
+      "download_ok": true, "note": ""
     }
   ],
-
-  "gallery": {
-    "path": "gallery/gallery.mp4",
-    "interclip_black_s": 0.5,
-    "rendered_at": "2026-04-28T18:30:00Z",
-    "rendered_index_count": 137
+  "galleries": {
+    "source":   { "path": "source_gallery.mp4",   "transform": "letterbox to 960×544, full original duration" },
+    "training": { "path": "training_gallery.mp4", "transform": "letterbox to 960×544, trimmed to 49 frames @24fps" }
   }
 }
 ```
 
-The `prompt` field on each clip is duplicated (sidecar file *and* in metadata) so a single `cat metadata.json | jq` shows everything. Duplicate's source of truth = the sidecar file. `manage.py` re-syncs into metadata on every change.
+Mutation lives here. `manage.py delete --index N` flips `status`, moves files to `_trash/<ts>/`, appends `audit/deletions.log`, regenerates galleries.
 
 ---
 
-## 4. Gallery video — the QC artifact
+## 4. Brand tokens — just-in-time substitution
 
-### Visual layout
-
-```
-┌────────────────────────────────────┐
-│ #0001                              │  ← top-left, large, white-on-black box
-│                                    │
-│      [original clip pixels]        │
-│                                    │
-│ ┌────────────────────────────────┐ │
-│ │ CHASE_PP marches down the      │ │  ← bottom, captioned
-│ │ Adventure Bay sidewalk in his  │ │
-│ │ police uniform, proud.         │ │
-│ └────────────────────────────────┘ │
-└────────────────────────────────────┘
-                                                 (then 0.5s of pure black)
-                                                 (then clip #0002, same overlay scheme)
+Map: `scripts/dataset_pipeline/brand_tokens.yaml`
+```yaml
+substitutions:
+  Chase: CHASE_PP
+  Skye:  SKYE_PP
 ```
 
-### ffmpeg pipeline (two-pass)
+**Where it's applied** (only two places — never persists):
 
-**Pass 1 — render each clip with overlay** (same resolution + FPS for clean concat):
+1. **`render_gallery_for_dataset.py`** — burns substituted text into the gallery overlay so QA matches what the model sees.
+2. **`emit_trainer_csv.py`** — writes `_trainer_input.csv` with substituted `caption` column for the trainer.
 
-```bash
-# For each clip i:
-ffmpeg -y -i videos/0001.mp4 \
-  -vf "scale=960:544:force_original_aspect_ratio=decrease,
-       pad=960:544:(ow-iw)/2:(oh-ih)/2:black,
-       drawtext=text='#0001':x=30:y=30:fontsize=64:fontcolor=white:
-                box=1:boxcolor=black@0.6:boxborderw=12,
-       drawtext=textfile=prompts/0001.txt:reload=0:
-                x=(w-text_w)/2:y=h-110:fontsize=32:fontcolor=white:
-                box=1:boxcolor=black@0.7:boxborderw=12:line_spacing=8" \
-  -r 24 -c:v libx264 -preset fast -crf 20 -pix_fmt yuv420p \
-  -an \                                            # gallery is silent — captions carry the meaning
-  gallery/per_clip/0001.mp4
-```
-
-**Pass 2 — black inter-clip frame + concatenate** (stream copy, fast):
-
-```bash
-# One-time black filler, 0.5s @ 24fps, same encode settings
-ffmpeg -y -f lavfi -i color=c=black:s=960x544:d=0.5:r=24 \
-  -c:v libx264 -preset fast -crf 20 -pix_fmt yuv420p \
-  gallery/per_clip/_black.mp4
-
-# Build concat list (skip clips marked deleted in metadata.json):
-cat > /tmp/concat.txt <<EOF
-file 'per_clip/0001.mp4'
-file 'per_clip/_black.mp4'
-file 'per_clip/0002.mp4'
-file 'per_clip/_black.mp4'
-...
-EOF
-
-# Concat without re-encoding (fast)
-ffmpeg -y -f concat -safe 0 -i /tmp/concat.txt -c copy gallery/gallery.mp4
-```
-
-### Why two-pass
-
-- Pass 1 normalizes resolution + FPS + codec across heterogeneous source clips, so pass 2 can use `-c copy` (no re-encode → seconds, not minutes, for a 150-clip gallery).
-- Each per-clip render is cached in `gallery/per_clip/`. Re-rendering after a deletion is one ffmpeg invocation (rebuild concat list, re-concat). No per-clip work repeats.
-
-### Length sanity
-
-150 clips × ~2–4s + 150 × 0.5s gaps ≈ **6–12 minutes total**. Skimmable.
-
-### Resolution
-
-Gallery clips render at **960×544 @ 24fps** to match the recommended training resolution (per `Phase0_ResolutionFPS.md`). If you'd rather see source resolution preserved (so artifacts caused by training-resolution downscale aren't masked in QC), I can flip pass 1 to `-vf "drawtext=...,drawtext=..."` only and skip the scale step — at the cost of needing pass 2 to re-encode. Quick to switch.
+`metadata.json[*].prompt` always carries the **raw** character name. Changing the token format → edit the YAML, re-run gallery + CSV emit. Source data never re-extracted.
 
 ---
 
-## 5. The "delete clip #42" workflow
+## 5. Gallery videos
+
+Both galleries: 960×784 canvas (544 video + 240 caption band). Index `#NNNN` top-left, caption bottom band, source audio preserved.
+
+| | source_gallery.mp4 | training_gallery.mp4 |
+|---|---|---|
+| Source files | `videos/` (raw downloads) | `processed_videos/` (pre-letterboxed) |
+| Per-clip transform | `scale-to-fit + black-bar pad` (letterbox) | none — already letterboxed |
+| Per-clip duration | full original (variable, 2–6 s) | 49 frames @ 24fps = 2.04s exactly |
+| Use | "what the source actually looks like" | "what the model trains on" |
+
+Compare them side-by-side: if `training_gallery` clips a key action that's still ongoing in `source_gallery`, that clip is a candidate for `manage.py delete`.
+
+**Why letterbox not crop:** earlier center-crop policy was clipping characters' ears. Letterbox preserves all original content; black bars are a visible signal to QA, not learned-bad-data.
+
+---
+
+## 6. The build pipeline
+
+For one character at full scale:
+
+```bash
+# On the GPU VM:
+bash scripts/dataset_pipeline/build_full.sh chase    # → ~/training_data_full/chase_golden_v1
+bash scripts/dataset_pipeline/build_full.sh skye     # → ~/training_data_full/skye_golden_v2
+```
+
+Internally that runs four stages (each idempotent — re-running skips completed work):
+
+| # | Stage | Script | What it does |
+|---|---|---|---|
+| 1 | raw | `build_poc.py --limit 0` | Resolves manifest URLs, downloads `videos/*.mp4`, ffprobes each, writes `metadata.json` |
+| 2 | letterbox + galleries | `render_gallery_for_dataset.py` | Pre-processes raw → `processed_videos/` (960×544 letterbox + 49-frame trim), renders both galleries with brand tokens |
+| 3 | trainer CSV | `emit_trainer_csv.py` | Writes `_trainer_input.csv` (ephemeral) at dataset root with `caption` (substituted) + `video_path` (→ `processed_videos/0NNN.mp4`) |
+| 4 | latents + conditions | `process_dataset.py` (LTX-2 trainer) | Encodes VAE latents + Gemma text embeddings into `precomputed/` |
+
+Stage 4 is the only GPU-bound stage. On A100 80GB it processes ~1 clip every 5–10s; full chase (605) ≈ 60 min, full skye (111) ≈ 12 min.
+
+---
+
+## 7. Skye-specific quirk: v2 manifest URLs are stale
+
+`skye_golden_dataset_v2.parquet` was published with URLs pointing to a target GCS layout that was never populated (`TinyStories/data_sets/golden_skye/videos/paw_patrol/...`). 0/111 of those URLs resolve.
+
+`build_poc.py:build_skye()` joins each v2 row to `skye_all_seasons_results_filtered_augmented_no_text_train_*.parquet` on `(season_number, episode_number, scene_number, internal_episode, speaker='SKYE')` and uses that row's URL — which IS live. 111/111 join coverage verified. Captions still come from v2 (the curated set the user picked).
+
+If a future v3 publishes valid URLs, the join is replaced by direct `output_video_path` reads.
+
+---
+
+## 8. The "delete clip #42" workflow
 
 ```bash
 python scripts/dataset_pipeline/manage.py delete \
-  --dataset chase_golden_v1_20260428 \
+  --dataset gs/training_data/.../chase_golden_v1 \
   --index 42 \
   --reason "low quality, character off-model"
 ```
 
-What happens, atomically:
+Atomic per invocation:
+1. Move `videos/0042.mp4`, `processed_videos/0042.mp4`, `precomputed/{latents,conditions}/videos/0042.pt`, `_qa_render_cache/{source,training}/per_clip/0042.mp4` → `_trash/<ts>/`.
+2. Update `metadata.json`: clip 42's `status` → `deleted`, `deletion` block populated.
+3. Append `audit/deletions.log`.
+4. Re-concat both galleries (per-clip overlays are kept; missing index just yields a gap).
+5. Print summary.
 
-1. Read `metadata.json`, find clip with `index=42`. Refuse if it doesn't exist or is already `status=deleted`.
-2. Move (don't rm) `videos/0042.mp4`, `prompts/0042.txt`, `latents/0042.pt`, `gallery/per_clip/0042.mp4` into a top-level `_trash/{deleted_at}/` (also gitignored, GCS-side moves are server-side renames). Recoverable for 7 days; cron-cleanup later.
-3. Update metadata.json: clip 42's `status` flips to `deleted`, `deletion` block populated.
-4. Append a line to `audit/deletions.log` (date, index, reason, who).
-5. Rebuild `prompts/all.csv` (active clips only).
-6. Re-concat the gallery (one `ffmpeg -f concat`, ~5 seconds).
-7. Print summary: `dataset chase_golden_v1: 137 active, 13 deleted (after this op).`
+Inverse: `manage.py restore --index 42` (recovers from `_trash/` if still there).
 
-Bulk variant: `manage.py delete --indices 5,17,42,89-92` for ranges.
-
-Inverse: `manage.py restore --index 42` (puts it back from `_trash/` if still there).
+Indices never renumber — gaps are intentional. "Clip #42" means index 42 forever.
 
 ---
 
-## 6. Build pipeline (`build_dataset.py`)
+## 9. How to validate a dataset before training
 
-The script that creates a fresh dataset from inputs:
+1. Download `qa_gallery` files locally:
+   ```bash
+   for f in source training; do
+     gcloud storage cp gs://.../{dataset}/${f}_gallery.mp4 ~/Desktop/${dataset}_${f}.mp4
+   done
+   ```
+2. Watch `training_gallery.mp4` end-to-end. Note any indices where the action is half-cut or the caption is off.
+3. For suspicious indices, open `source_gallery.mp4` to check if the original framing is salvageable.
+4. `manage.py delete --indices 5,17,42-44 --reason "..."`.
+5. Re-run `render_gallery_for_dataset.py` (rebuilds galleries with gaps) + `emit_trainer_csv.py` (excludes deleted clips).
+6. Re-run `process_dataset.py` to re-encode any added/changed clips (existing clip latents are skipped).
+
+---
+
+## 10. Smoke train (pipeline validator, not real training)
+
+`packages/ltx-trainer/configs/_smoke_chase_v1.yaml` — minimal 50-step rank-16 LoRA on the 5-clip chase POC. Run:
 
 ```bash
-python scripts/dataset_pipeline/build_dataset.py \
-  --manifest gs://video_gen_dataset/dataset/labelbox/chase_golden.json \
-  --character chase \
-  --version 1 \
-  --target-resolution 960x544 --target-fps 24 --frames 49 \
-  --brand-token CHASE_PP \
-  --output gs://video_gen_dataset/training_data/chase_golden_v1_20260428/
+/home/efrattaig/.local/bin/uv run python packages/ltx-trainer/scripts/train.py \
+  packages/ltx-trainer/configs/_smoke_chase_v1.yaml
 ```
 
-Stages, all idempotent (re-run resumes from where it stopped):
+Pass criteria, all met on 2026-04-28:
+- ✅ Trainer reads `precomputed/{latents,conditions}` without errors.
+- ✅ Loss decreases (50/50 steps, final loss 0.346, no NaN).
+- ✅ LoRA weights saved at `outputs/_smoke_chase_v1/checkpoints/lora_weights_step_00050.safetensors`.
+- ✅ 2.1 min total (3.4 s/step), 50 GB peak GPU memory.
 
-| # | Stage | Where it runs | What it does |
-|---|---|---|---|
-| 1 | `fetch_manifest` | local | Download chase_golden.json + .parquet → cache locally with md5 verify |
-| 2 | `extract_clips` | GPU VM (or anywhere with disk + bandwidth) | For each manifest entry: pull source episode mp4 from `raw/paw_patrol/`, ffmpeg-cut at `[t0, t1]`, scale to 960×544 @ 24fps, 49-frame trim, write `videos/0NNN.mp4` |
-| 3 | `write_prompts` | local | Read caption from manifest, substitute character name → `CHASE_PP`, write `prompts/0NNN.txt` |
-| 4 | `encode_latents` | **GPU VM** | Run trainer's preprocessing on each `videos/0NNN.mp4` → `latents/0NNN.pt` |
-| 5 | `render_gallery` | local or VM (CPU-bound ffmpeg) | §4 pass 1 + pass 2 → `gallery/gallery.mp4` |
-| 6 | `write_metadata` | local | Assemble `metadata.json` from all of the above (md5s, durations, dimensions, source provenance) |
-| 7 | `upload` | local | rclone/gsutil push to `gs://.../training_data/{dataset_id}/` |
-
-Each stage writes a `audit/build.log` line with stage name, start/end ts, output digest. Re-running `build_dataset.py` skips stages whose outputs already exist with matching md5 (provenance from previous run).
+The smoke is the contract: any future dataset rebuild must still pass this before scale-up training.
 
 ---
 
-## 7. What gets thrown away on cutover
+## 11. Pipeline scripts — reference
 
-Per your "regenerate over salvage" rule:
-
-| Old location | What it has | Plan |
-|---|---|---|
-| `gs://video_gen_dataset/TinyStories/data_sets/full_cast_combined_preprocessed/*.pt` | 1 563 preprocessed latents | **Discard.** Regenerated by stage 4 above. |
-| `gs://video_gen_dataset/TinyStories/data_sets/full_cast_raw/*.{mp4,csv}` | 136 mp4s + 4 csvs | **Discard.** Regenerated from manifest + raw. |
-| `gs://video_gen_dataset/TinyStories/data_sets/golden_skye/videos/*.mp4` | 636 mp4s | **Discard.** Regenerated. |
-| `gs://video_gen_dataset/TinyStories/data_sets/phase4_phase1_chase_skye/` | 1 021 files | **Discard.** Phase 4 dataset gets its own `phase4_v1_*` build later. |
-| `gs://video_gen_dataset/TinyStories/character_images_bank/*.jpg` | 138 anchor stills | **Discard.** Anchor stills regenerated by an `anchors_extract.py` (separate flow, see §9). |
-| `gs://video_gen_dataset/dataset/labelbox/output/*.json` (22 669 files) | Per-frame Labelbox annotations | **Discard.** We don't use Labelbox per-frame annotations downstream. |
-| `gs://video_gen_dataset/dataset/labelbox/videos/*.{mp4,wav}` | 4 721 paired clips | **Keep as input only** if a manifest still references them; otherwise the new pipeline pulls fresh from `raw/`. |
-
-**Action on discard:** move to `gs://video_gen_dataset/_archive/2026-04-28/` (one-time snapshot) before any deletion. We never `rm` directly; we move and let lifecycle policy clean up after 30 days. You approve the archive move; the lifecycle policy deletes itself.
-
----
-
-## 8. Tooling layout in this repo
-
-```
-scripts/dataset_pipeline/
-    build_dataset.py          # §6 orchestrator
-    manage.py                 # §5 delete / restore / list / verify
-    gallery.py                # §4 ffmpeg gallery (callable standalone)
-    schema.py                 # metadata.json dataclass + validators
-    stages/
-        fetch_manifest.py
-        extract_clips.py
-        write_prompts.py
-        encode_latents.py
-        render_gallery.py
-        write_metadata.py
-        upload.py
-    fonts/
-        Inter-Bold.ttf        # bundled to make drawtext deterministic across machines
-```
-
-`schema.py` is the canonical source for the `metadata.json` shape. Trainer + `manage.py` both depend on it. Linted via Pydantic or dataclasses-json.
-
----
-
-## 9. Anchor stills — separate but parallel
-
-Anchors are images, not clips, so they get their own slim pipeline:
-
-```
-gs://video_gen_dataset/training_data/{character}_anchors_v1_20260428/
-    metadata.json
-    images/
-        0001.jpg
-        ...
-    gallery/
-        contact_sheet.jpg     ← grid of all anchors with index labels (no video gallery, this is stills)
-    audit/build.log
-```
-
-`scripts/dataset_pipeline/anchors_extract.py`:
-- Pulls a list of (episode, frame_index) from a small input JSON (or random sampling from S-tier scenes).
-- ffmpeg-extracts frames.
-- Filters by sharpness + face-detection presence.
-- Renders contact sheet via ImageMagick.
-
-Same `manage.py delete --index N` semantics. Same metadata schema (with `images/` instead of `videos/`).
-
-This is a v1.1 deliverable — not blocking the clip pipeline. Mention here for completeness.
-
----
-
-## 10. Open questions before I start coding
-
-Small, all answerable in one message:
-
-1. **Where do I run `extract_clips` and `encode_latents`?** GPU VM (`35.238.2.51`) is the obvious place for stage 4 (latent encoding needs the trainer + GPU). Stage 2 (ffmpeg clip extraction) can run anywhere; running it on the same VM avoids streaming 494 GB of raw episodes to a laptop. Confirm I should plan for: stages 1, 3, 5, 6 local; stages 2, 4, 7 on the VM.
-
-2. **Captions: which field in `chase_golden.json` is the caption?** I haven't opened the manifest yet. Once I do, I'll show you the schema and confirm — if there's a `caption` field we use it directly; if there are multiple variants (`caption_orig`, `caption_recaptioned`), you pick which.
-
-3. **Brand-token substitution scope.** When a manifest caption says "Chase walks down the street" — do I rewrite to `CHASE_PP walks down the street` *during build*, or feed the model literal `Chase` and let the LoRA bind to that? My recommendation from the tokenizer probe (`Phase0_BrandTokens.md`) was `CHASE_PP` for Option A. Confirm we apply that substitution at build-time so the saved `prompts/*.txt` already contain `CHASE_PP`.
-
-4. **Font for drawtext.** Bundle `Inter-Bold.ttf` (free, clean, dense) or use a system font? Bundling avoids "looks different on Mac vs VM."
-
-5. **Initial dataset to build.** `chase_golden_v1` first, `skye_golden_v1` second? Or both in parallel since they share zero data?
-
-If you answer those — even briefly — I'll start with §8 scaffolding + §6 build pipeline, ending with the gallery video for `chase_golden_v1` so you have something to watch and react to.
-
----
-
-## 11. What this replaces in the existing plan
-
-- Phase 0 reports `Phase0_QualityReport.md` and `Phase0_AnchorGap.md` are now **obsolete** — they were measuring the wrong pool. Mark them deprecated; the gallery video replaces them as the QC artifact.
-- `Phase0_BrandTokens.md` and `Phase0_ResolutionFPS.md` are still load-bearing — their conclusions (`CHASE_PP`/`SKYE_PP`, 960×544 @ 24fps, 49 frames) are inputs to this pipeline.
-- `docs/training_data.md` (the live map) gets a new section pointing to the rebuilt datasets once they exist; old GCS prefixes stay in the map under "archive candidates" until you confirm cleanup.
-- The §5 target consolidation layout I proposed yesterday is **superseded** by §2 here. Same spirit, more concrete.
+| Script | Purpose |
+|---|---|
+| `scripts/dataset_pipeline/build_poc.py` | Stage 1: resolve manifest, download raw clips, write metadata.json. `--limit 0` = full manifest. |
+| `scripts/dataset_pipeline/captions.py` | Caption resolver: multi-parquet URL→caption lookup; `apply_brand_tokens(s, mapping)`; `load_brand_tokens()` reads YAML. |
+| `scripts/dataset_pipeline/gallery.py` | ffmpeg renderers: `transform_to_training_format()`, `render_per_clip(mode='source'|'training')`, concat helpers. |
+| `scripts/dataset_pipeline/render_gallery_for_dataset.py` | Stage 2 driver: preprocess + dual gallery + metadata update. |
+| `scripts/dataset_pipeline/emit_trainer_csv.py` | Stage 3: write `_trainer_input.csv` with brand-token substitution. |
+| `scripts/dataset_pipeline/build_full.sh` | Stages 1–4 wrapper for one character (used overnight). |
+| `scripts/dataset_pipeline/upload_dataset_to_gcs.sh` | Pull built dataset from VM, push to GCS via local creds. |
+| `scripts/dataset_pipeline/manage.py` | Mutation: `delete`, `restore`, `list`, `rebuild-gallery`. |
+| `scripts/dataset_pipeline/brand_tokens.yaml` | Substitution map (configurable, no rebuild needed to change). |
+| `packages/ltx-trainer/configs/_smoke_chase_v1.yaml` | 50-step pipeline validator config. (gitignored — scp'd to VM.) |
