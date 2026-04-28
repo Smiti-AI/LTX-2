@@ -5,10 +5,12 @@ artifact for `process_dataset.py`, not a persisted dataset asset.
 
 Usage:
     python emit_trainer_csv.py --dataset DATASET_DIR \
-        [--out DATASET_DIR/precomputed/_trainer_input.csv]
+        [--out DATASET_DIR/_trainer_input.csv]
 
-Default output is `<dataset>/precomputed/_trainer_input.csv` so it lives
-alongside the latents the trainer will produce. Idempotent — overwrite OK.
+Default output is `<dataset>/_trainer_input.csv` (dataset ROOT), because
+the trainer resolves the `video_path` column relative to the CSV's own
+directory. Putting the CSV at root makes `processed_videos/0001.mp4`
+resolve correctly. Idempotent — overwrite OK.
 """
 from __future__ import annotations
 
@@ -61,7 +63,7 @@ def main() -> int:
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
     root = Path(args.dataset).resolve()
-    out = Path(args.out) if args.out else root / "precomputed" / "_trainer_input.csv"
+    out = Path(args.out) if args.out else root / "_trainer_input.csv"
     n = emit(root, out)
     token_map = load_brand_tokens()
     print(f"wrote {out} ({n} active clips)")
