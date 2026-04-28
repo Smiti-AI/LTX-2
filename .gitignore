@@ -43,3 +43,12 @@ tmp
 # Exception: track scene assets for reproducibility
 !input/scenes/**/*.png
 !input/scenes/**/*.json
+
+# Pre-flight: paths/IDs (gitignored; commit the example template instead)
+docs/pre_flight.yaml
+.envrc
+
+# Phase 0 raw audit artifacts (large; reports are committed, raw CSVs are not)
+docs/phase0/data_inventory.csv
+docs/phase0/duplicates.csv
+docs/phase0/quality_triage.csv

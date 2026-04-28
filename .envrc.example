@@ -1,0 +1,21 @@
+# direnv-loaded env file for this project. Copy to `.envrc` (gitignored) and
+# `direnv allow`. Use `_unset_or_value` so we don't clobber values already set
+# in your shell.
+#
+# Phase 0 only strictly needs HF_TOKEN (auto-loaded from
+# ~/.cache/huggingface/token if huggingface-cli login was run). The rest
+# become required later in Step 2/3 work or for cloud training.
+
+# Hugging Face — already set up at ~/.cache/huggingface/token. Override here only if needed.
+# export HF_TOKEN="hf_..."
+
+# Weights & Biases
+# export WANDB_API_KEY="..."
+# export WANDB_PROJECT="LTX2_lora"
+# export WANDB_ENTITY="shayzweig-smiti-ai"
+
+# Gemini API (for VLM-based QC in later phases — NOT used in Phase 0)
+# export GEMINI_API_KEY="..."
+
+# GCP — using user account creds, no SA key. If switching to SA, set:
+# export GOOGLE_APPLICATION_CREDENTIALS="$HOME/.config/gcloud/paw-patrol-engine-sa.json"

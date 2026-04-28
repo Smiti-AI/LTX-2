@@ -1,0 +1,53 @@
+# Pre-flight schema (active_plan §0). Copy to docs/pre_flight.yaml (gitignored)
+# and fill in. Secrets do NOT live here — they live in .envrc.
+#
+# Run `python scripts/preflight_check.py` to validate.
+
+gcp:
+  project: shapeshifter-459611
+  buckets_to_audit:
+    - video_gen_dataset
+    - shapeshifter_model_checkpoints
+    - sm_ml_models
+    - encord_dataset
+    - videoform
+    - shapeshifter-459611-models
+  gcs_known_data_prefixes:
+    - gs://video_gen_dataset/TinyStories/
+  auth_method: user_account  # user_account | service_account
+  service_account_key_path: null  # set when auth_method=service_account
+
+wandb:
+  project: LTX2_lora
+  entity: shayzweig-smiti-ai
+
+github:
+  repo: https://github.com/Smiti-AI/LTX-2.git
+  branch_strategy: trunk
+  auto_commit: per_task_no_push
+
+data_paths:
+  golden_set_150: TBD
+  high_res_stills_partial: TBD
+  local_inputs_root: /Users/efrattaig/projects/sm/LTX-2/inputs
+  extra_paths: []
+
+remote:
+  servers:
+    - {ip: 35.238.2.51, user: efrattaig, status: active, gcs_auth: metadata_server, repo: /home/efrattaig/LTX-2, python: "3.10.12", gpu: "A100-SXM4-80GB"}
+    - {ip: 34.56.137.11, user: efrat_t_smiti_ai, status: unreachable, gcs_auth: unknown, repo: TBD, python: TBD, gpu: TBD}
+  trainer_clone_local: packages/ltx-trainer
+
+env:
+  python_local: "3.13.4"
+  training_target: gcp_only
+  install_permission: granted
+
+# Whisper deferred per session decision (Phase 0 doesn't need it; revisit before Step 2).
+whisper:
+  choice: deferred
+
+# Watermark detection in §3.2 needs PP logo template crops.
+# If null, the watermark metric is SKIPPED and listed as a follow-up in the report.
+phase0:
+  pp_watermark_templates: null
