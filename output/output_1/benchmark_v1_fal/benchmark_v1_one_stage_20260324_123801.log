@@ -1,22 +1,0 @@
-Run configuration (resolved):
-BENCHMARK_DIR = /home/smiti-user/LTX-2/input/benchmark_v1
-OUTPUT_DIR = /home/smiti-user/LTX-2/output/benchmark_v1_fal
-CHECKPOINT = /home/smiti-user/LTX-2/models/ltx-2.3-22b-dev.safetensors
-GEMMA_ROOT = /home/smiti-user/LTX-2/models/gemma-3-12b-it-qat-q4_0-unquantized
-DISTILLED_LORA = /home/smiti-user/LTX-2/models/ltx-2.3-22b-distilled-lora-384.safetensors
-SPATIAL_UPSAMPLER = /home/smiti-user/LTX-2/models/ltx-2.3-spatial-upscaler-x2-1.0.safetensors
-BENCHMARK_PIPELINE = one_stage
-BENCHMARK_PROFILE = fal
-EFFECTIVE_PIPELINE = one_stage
-RESOLUTION_SNAP = 32
-PYTHON_MODULE = ltx_pipelines.ti2vid_one_stage
-SEEDS = 42
-PROMPT_INDEX = 0
-NUM_INFERENCE_STEPS = 30
-
-[RUN] skye_chase_crosswalk_safety (seed=42) -> /home/smiti-user/LTX-2/output/benchmark_v1_fal/skye_chase_crosswalk_safety_1stage_p0_10s_1920x1088.mp4
-[RUN] skye_chase_crosswalk_safety (seed=42) -> /home/smiti-user/LTX-2/output/benchmark_v1_fal/skye_chase_crosswalk_safety_1stage_p0_10s_1920x1088.mp4
-/usr/lib/python3.10/runpy.py:126: RuntimeWarning: 'ltx_pipelines.ti2vid_one_stage' found in sys.modules after import of package 'ltx_pipelines', but prior to execution of 'ltx_pipelines.ti2vid_one_stage'; this may result in unpredictable behaviour
-  warn(RuntimeWarning(msg))
-Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
-  0%|          | 0/30 [00:00<?, ?it/s]  3%|▎         | 1/30 [00:53<25:58, 53.75s/it]  7%|▋         | 2/30 [01:47<25:01, 53.63s/it] 10%|█         | 3/30 [02:41<24:09, 53.67s/it] 13%|█▎        | 4/30 [03:34<23:15, 53.67s/it] 17%|█▋        | 5/30 [04:28<22:21, 53.66s/it] 20%|██        | 6/30 [05:22<21:28, 53.68s/it] 23%|██▎       | 7/30 [06:15<20:34, 53.66s/it] 27%|██▋       | 8/30 [07:09<19:40, 53.67s/it] 30%|███       | 9/30 [08:03<18:46, 53.67s/it] 33%|███▎      | 10/30 [08:56<17:53, 53.66s/it] 37%|███▋      | 11/30 [09:50<16:59, 53.64s/it] 40%|████      | 12/30 [10:43<16:05, 53.65s/it] 43%|████▎     | 13/30 [11:37<15:12, 53.66s/it] 47%|████▋     | 14/30 [12:31<14:18, 53.66s/it] 50%|█████     | 15/30 [13:24<13:24, 53.66s/it] 53%|█████▎    | 16/30 [14:18<12:31, 53.66s/it] 57%|█████▋    | 17/30 [15:12<11:37, 53.66s/it]

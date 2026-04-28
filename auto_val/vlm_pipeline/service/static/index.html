@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>VLM Video QA — Compare</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #0a0e14;
+    --panel: #131922;
+    --panel-2: #0f141c;
+    --border: #1f2733;
+    --border-2: #2a3441;
+    --text: #e6edf3;
+    --muted: #8b95a5;
+    --dim: #5c6675;
+    --accent: #58a6ff;
+    --a-color: #58a6ff;
+    --b-color: #c977ff;
+    --good: #3fb950;
+    --warn: #d29922;
+    --bad: #f85149;
+    --queued: #5c6675;
+    --shadow: 0 4px 20px rgba(0,0,0,0.4);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; min-height: 100vh;
+    background:
+      radial-gradient(circle at 20% 0%, rgba(88,166,255,0.06), transparent 50%),
+      radial-gradient(circle at 80% 100%, rgba(201,119,255,0.05), transparent 50%),
+      var(--bg);
+    color: var(--text);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 1200px; margin: 0 auto; padding: 40px 32px 80px; }
+  header { margin-bottom: 32px; }
+  h1 { font-size: 28px; margin: 0 0 4px; font-weight: 700; letter-spacing: -0.5px; }
+  header .sub { color: var(--muted); font-size: 14px; }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px; margin-bottom: 16px;
+  }
+  .card.elev { box-shadow: var(--shadow); }
+  .card h2 { font-size: 13px; margin: 0 0 14px; color: var(--muted);
+    font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .row { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; }
+  .row > * { flex: 1; min-width: 140px; }
+
+  label { display: block; font-size: 11px; color: var(--muted);
+    margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.6px;
+    font-weight: 600; }
+  input[type=text], input[type=number], textarea, select {
+    width: 100%; padding: 10px 12px; background: var(--panel-2);
+    border: 1px solid var(--border-2); border-radius: 8px; color: var(--text);
+    font: inherit; outline: none; transition: border-color 0.15s, background 0.15s;
+  }
+  input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 64px; }
+  select { cursor: pointer; }
+
+  .video-slot { position: relative; }
+  .video-slot .picker {
+    border: 2px dashed var(--border-2); border-radius: 10px;
+    padding: 24px; text-align: center; cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    background: var(--panel-2);
+  }
+  .video-slot .picker:hover { border-color: var(--accent); background: rgba(88,166,255,0.04); }
+  .video-slot input[type=file] { display: none; }
+  .video-slot .picker-label { font-weight: 600; }
+  .video-slot .picker-hint { color: var(--muted); font-size: 12px; margin-top: 4px; }
+  .video-slot video {
+    width: 100%; max-height: 280px; background: #000;
+    border-radius: 10px; display: block; margin-bottom: 8px;
+  }
+  .video-slot .filename {
+    font-size: 12px; color: var(--muted); margin-bottom: 6px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .video-slot .change-btn {
+    background: transparent; border: 1px solid var(--border-2);
+    color: var(--muted); padding: 6px 12px; border-radius: 6px;
+    cursor: pointer; font: inherit; font-size: 12px;
+  }
+  .video-slot .change-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .label-pill {
+    display: inline-block; padding: 2px 10px; border-radius: 12px;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
+    background: rgba(88,166,255,0.15); color: var(--a-color);
+  }
+  .label-pill.b { background: rgba(201,119,255,0.15); color: var(--b-color); }
+
+  .btn {
+    background: linear-gradient(180deg, #6cb6ff 0%, #4a98ee 100%);
+    color: #000; border: 0; padding: 12px 24px;
+    border-radius: 8px; cursor: pointer; font: 600 14px/1 inherit;
+    transition: transform 0.05s, box-shadow 0.15s;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.2) inset, 0 2px 6px rgba(0,0,0,0.3);
+  }
+  .btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(88,166,255,0.3); }
+  .btn:disabled { background: var(--border-2); color: var(--dim); cursor: not-allowed; box-shadow: none; }
+  .btn-secondary { background: transparent; border: 1px solid var(--border-2); color: var(--text); }
+  .btn-secondary:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+
+  /* ── Progress view ── */
+  .stage-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 600;
+    background: rgba(88,166,255,0.1); color: var(--accent);
+    margin-bottom: 12px;
+  }
+  .stage-badge .dot {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--accent);
+    animation: pulse 1.2s infinite;
+  }
+  .stage-badge.complete { background: rgba(63,185,80,0.1); color: var(--good); }
+  .stage-badge.complete .dot { background: var(--good); animation: none; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.85); }
+  }
+
+  .timer { font: 600 13px ui-monospace, Menlo, monospace; color: var(--muted); }
+  .timer .num { color: var(--text); }
+
+  .agent-list { list-style: none; margin: 0; padding: 0; }
+  .agent-list li {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border-radius: 6px;
+    font-size: 13px; transition: background 0.15s;
+  }
+  .agent-list li.queued { color: var(--dim); }
+  .agent-list li.running { background: rgba(88,166,255,0.08); color: var(--text); }
+  .agent-list li.done { color: var(--text); }
+  .agent-list li.done.minor { color: var(--warn); }
+  .agent-list li.done.major { color: var(--bad); }
+  .agent-list .icon {
+    width: 18px; height: 18px; border-radius: 50%; flex: 0 0 auto;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700;
+  }
+  .agent-list .queued .icon { background: var(--border-2); color: var(--dim); }
+  .agent-list .running .icon {
+    background: var(--accent); color: #000;
+    animation: spin 1.2s linear infinite;
+  }
+  .agent-list .done.great .icon { background: var(--good); color: #000; }
+  .agent-list .done.minor .icon { background: var(--warn); color: #000; }
+  .agent-list .done.major .icon { background: var(--bad); color: #000; }
+  .agent-list .title { flex: 1; }
+  .agent-list .verdict-text {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.5px; color: var(--muted);
+  }
+  .agent-list .done.great .verdict-text { color: var(--good); }
+  .agent-list .done.minor .verdict-text { color: var(--warn); }
+  .agent-list .done.major .verdict-text { color: var(--bad); }
+
+  @keyframes spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+
+  /* ── Results view ── */
+  .winner-card {
+    background: linear-gradient(135deg, rgba(88,166,255,0.1), rgba(201,119,255,0.06));
+    border: 1px solid var(--border-2);
+    border-radius: 14px; padding: 32px; text-align: center;
+    margin-bottom: 16px;
+  }
+  .winner-card .winner {
+    font-size: 36px; font-weight: 800; letter-spacing: -1px;
+    margin-bottom: 8px;
+  }
+  .winner-card .winner.tie { color: var(--muted); }
+  .winner-card .winner.A { color: var(--a-color); }
+  .winner-card .winner.B { color: var(--b-color); }
+  .winner-card .confidence {
+    display: inline-block; padding: 4px 12px; border-radius: 999px;
+    background: rgba(255,255,255,0.06); color: var(--muted);
+    font-size: 11px; font-weight: 700; letter-spacing: 0.6px;
+    text-transform: uppercase; margin-bottom: 14px;
+  }
+  .winner-card .headline { font-size: 16px; color: var(--text); margin-bottom: 0; }
+  .winner-card .reasoning { color: var(--muted); margin-top: 14px; font-size: 13px; max-width: 720px; margin-left: auto; margin-right: auto; }
+
+  .axis-grid {
+    display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px;
+  }
+  .axis-cell {
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px; text-align: center;
+  }
+  .axis-cell .axis-name {
+    font-size: 11px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.5px; font-weight: 600; margin-bottom: 6px;
+  }
+  .axis-cell .axis-winner {
+    font-size: 18px; font-weight: 700;
+  }
+  .axis-cell .axis-winner.A { color: var(--a-color); }
+  .axis-cell .axis-winner.B { color: var(--b-color); }
+  .axis-cell .axis-winner.tie { color: var(--muted); font-size: 14px; }
+
+  .score-card {
+    display: flex; align-items: center; gap: 16px; padding: 16px;
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  .score-gauge {
+    width: 70px; height: 70px; border-radius: 50%; flex: 0 0 auto;
+    display: flex; align-items: center; justify-content: center;
+    font: 800 22px ui-monospace, Menlo, monospace; color: var(--text);
+    background: conic-gradient(var(--gauge-color, var(--good)) calc(var(--score, 0) * 1%), var(--border) 0);
+    position: relative;
+  }
+  .score-gauge::before {
+    content: ""; position: absolute; inset: 4px; border-radius: 50%;
+    background: var(--panel-2);
+  }
+  .score-gauge span { position: relative; z-index: 1; }
+  .score-info { flex: 1; min-width: 0; }
+  .score-verdict { font-size: 12px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; }
+  .score-verdict.PASS { color: var(--good); }
+  .score-verdict.CONDITIONAL_PASS { color: var(--warn); }
+  .score-verdict.FAIL { color: var(--bad); }
+  .score-headline { font-size: 13px; color: var(--text); margin-top: 4px; line-height: 1.4; }
+
+  .agent-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .agent-cards .ac {
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px;
+    border-left: 3px solid var(--queued);
+  }
+  .agent-cards .ac.great { border-left-color: var(--good); }
+  .agent-cards .ac.minor { border-left-color: var(--warn); }
+  .agent-cards .ac.major { border-left-color: var(--bad); }
+  .agent-cards .ac-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 6px;
+  }
+  .agent-cards .ac-title { font-weight: 600; font-size: 13px; }
+  .agent-cards .ac-verdict {
+    font-size: 10px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 0.6px; padding: 2px 6px; border-radius: 4px;
+  }
+  .agent-cards .ac.great .ac-verdict { background: rgba(63,185,80,0.15); color: var(--good); }
+  .agent-cards .ac.minor .ac-verdict { background: rgba(210,153,34,0.15); color: var(--warn); }
+  .agent-cards .ac.major .ac-verdict { background: rgba(248,81,73,0.15); color: var(--bad); }
+  .agent-cards .ac-summary { font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .agent-cards .ac details { margin-top: 8px; }
+  .agent-cards .ac details summary {
+    cursor: pointer; font-size: 11px; color: var(--accent);
+    list-style: none;
+  }
+  .agent-cards .ac details summary::-webkit-details-marker { display: none; }
+  .agent-cards .ac details[open] summary { margin-bottom: 6px; }
+  .agent-cards .ac details .findings {
+    font-size: 12px; color: var(--text); white-space: pre-wrap;
+    background: var(--bg); padding: 8px; border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  .cost-bar {
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 16px;
+    display: flex; gap: 24px; align-items: center; flex-wrap: wrap;
+    font-size: 13px; color: var(--muted);
+  }
+  .cost-bar .total { color: var(--text); font: 700 16px ui-monospace, Menlo, monospace; }
+
+  .lockdown-notice {
+    background: rgba(210,153,34,0.08); border: 1px solid rgba(210,153,34,0.4);
+    border-radius: 8px; padding: 12px; font-size: 13px; color: var(--warn); margin: 12px 0;
+  }
+
+  .err {
+    background: rgba(248,81,73,0.08); border: 1px solid rgba(248,81,73,0.4);
+    border-radius: 8px; padding: 12px; color: var(--bad);
+    font: 12px ui-monospace, Menlo, monospace; white-space: pre-wrap;
+    margin-top: 8px;
+  }
+
+  .video-pair-results { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .video-pair-results video {
+    width: 100%; max-height: 200px; background: #000;
+    border-radius: 8px; display: block;
+  }
+
+  .hidden { display: none !important; }
+
+  /* ── How it works panel ── */
+  .how-it-works {
+    margin-top: 16px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 18px;
+  }
+  .how-it-works summary {
+    cursor: pointer; list-style: none;
+    font-size: 13px; font-weight: 600; color: var(--accent);
+    padding: 4px 0;
+  }
+  .how-it-works summary::-webkit-details-marker { display: none; }
+  .how-it-works[open] summary { margin-bottom: 14px; }
+  .how-it-works summary::before {
+    content: "▸"; display: inline-block; margin-right: 8px;
+    transition: transform 0.15s; color: var(--muted);
+  }
+  .how-it-works[open] summary::before { transform: rotate(90deg); }
+  .how-grid {
+    display: grid; gap: 12px;
+  }
+  .how-step {
+    display: flex; gap: 14px; align-items: flex-start;
+    padding: 10px 0; border-top: 1px solid var(--border);
+  }
+  .how-step:first-child { border-top: 0; padding-top: 0; }
+  .how-num {
+    flex: 0 0 auto;
+    width: 26px; height: 26px; border-radius: 50%;
+    background: rgba(88,166,255,0.12); color: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 13px;
+  }
+  .how-body { flex: 1; font-size: 13px; line-height: 1.6; color: var(--text); }
+  .how-body strong { color: var(--text); }
+  .how-body em { color: var(--muted); font-style: normal; }
+  .how-list {
+    margin: 6px 0 0; padding: 0 0 0 16px;
+    color: var(--muted); font-size: 12px; line-height: 1.7;
+  }
+  .how-list li b { color: var(--text); font-weight: 600; }
+  .how-prompt-note {
+    margin-top: 14px; padding: 12px 14px;
+    background: rgba(88,166,255,0.06); border: 1px solid rgba(88,166,255,0.2);
+    border-radius: 8px; font-size: 13px; line-height: 1.6;
+  }
+  .how-prompt-note strong { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Which video is better?</h1>
+    <div class="sub">Pick a winner between two AI-generated videos in about 90 seconds — without watching either of them ten times.</div>
+  </header>
+
+  <!-- ─── UPLOAD VIEW ──────────────────────────────────────────────── -->
+  <section id="upload-view">
+    <div class="card elev">
+      <h2>Videos</h2>
+      <div class="grid-2">
+        <div>
+          <div class="row" style="margin-bottom: 12px"><span class="label-pill">A</span></div>
+          <div class="video-slot" data-slot="a">
+            <div class="picker" id="picker-a">
+              <input type="file" id="video-a" accept="video/*" required>
+              <div class="picker-label">Pick video A</div>
+              <div class="picker-hint">click or drop a file</div>
+            </div>
+            <div class="preview hidden" id="preview-a">
+              <video controls preload="metadata"></video>
+              <div class="filename"></div>
+              <button type="button" class="change-btn">Change file</button>
+            </div>
+          </div>
+          <label for="prompt-a" style="margin-top: 14px">What was this video supposed to show? <span style="color: var(--dim); font-weight: 400; text-transform: none; letter-spacing: 0">(optional, but recommended)</span></label>
+          <textarea id="prompt-a" placeholder="Paste the prompt you used to generate this video. We'll check whether the result actually matches what you asked for."></textarea>
+        </div>
+        <div>
+          <div class="row" style="margin-bottom: 12px"><span class="label-pill b">B</span></div>
+          <div class="video-slot" data-slot="b">
+            <div class="picker" id="picker-b">
+              <input type="file" id="video-b" accept="video/*" required>
+              <div class="picker-label">Pick video B</div>
+              <div class="picker-hint">click or drop a file</div>
+            </div>
+            <div class="preview hidden" id="preview-b">
+              <video controls preload="metadata"></video>
+              <div class="filename"></div>
+              <button type="button" class="change-btn">Change file</button>
+            </div>
+          </div>
+          <label for="prompt-b" style="margin-top: 14px">What was this video supposed to show? <span style="color: var(--dim); font-weight: 400; text-transform: none; letter-spacing: 0">(optional, but recommended)</span></label>
+          <textarea id="prompt-b" placeholder="Paste the prompt you used to generate this video. We'll check whether the result actually matches what you asked for."></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Run settings</h2>
+      <div class="row">
+        <div>
+          <label for="mode">Mode</label>
+          <select id="mode">
+            <option value="cheap" selected>cheap — Flash everything (~$0.10)</option>
+            <option value="mock">mock — no API calls (free, returns stub)</option>
+            <option value="pro">pro — Pro for VLM (locked)</option>
+            <option value="max">max — Pro + denser grids (locked)</option>
+          </select>
+        </div>
+        <div>
+          <label for="label-a">Label A</label>
+          <input id="label-a" type="text" value="A">
+        </div>
+        <div>
+          <label for="label-b">Label B</label>
+          <input id="label-b" type="text" value="B">
+        </div>
+      </div>
+      <div id="cost-fields" class="hidden">
+        <div class="lockdown-notice">
+          Pro and Max are locked. They require all of: <code>EXPENSIVE_MODES_DISABLED=False</code> in <code>core/safety.py</code>, today's UTC date in <code>VLM_EXPENSIVE_UNLOCK</code>, and the two flags below.
+        </div>
+        <div class="row">
+          <div>
+            <label><input type="checkbox" id="accept-cost"> I accept the cost of this run</label>
+          </div>
+          <div>
+            <label for="max-spend">Max spend (USD)</label>
+            <input id="max-spend" type="number" step="0.01" min="0" placeholder="e.g. 2.00">
+          </div>
+        </div>
+      </div>
+      <div style="margin-top: 18px; display: flex; gap: 12px; align-items: center;">
+        <button id="submit-btn" class="btn">Compare videos</button>
+        <span id="submit-hint" class="timer">cheap mode runs ~80s per video, in parallel</span>
+      </div>
+      <div id="submit-error" class="err hidden"></div>
+    </div>
+  </section>
+
+  <!-- ─── PROGRESS VIEW ──────────────────────────────────────────────── -->
+  <section id="progress-view" class="hidden">
+    <div class="card elev">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 16px">
+        <div>
+          <div class="stage-badge"><span class="dot"></span><span id="overall-stage">Starting…</span></div>
+          <div style="font-size: 13px; color: var(--muted); margin-left: 4px">Job <code id="progress-job-id"></code></div>
+        </div>
+        <div class="timer">
+          <span class="num" id="elapsed-overall">0s</span>
+          <span style="color: var(--dim)">·</span>
+          <span>cheap ≈ 80s/video</span>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div id="side-a-progress"></div>
+        <div id="side-b-progress"></div>
+      </div>
+      <div id="comparator-progress" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);" class="hidden"></div>
+    </div>
+    <div id="progress-error" class="err hidden"></div>
+  </section>
+
+  <!-- ─── RESULTS VIEW ──────────────────────────────────────────────── -->
+  <section id="results-view" class="hidden">
+    <div class="winner-card">
+      <div class="confidence" id="winner-confidence">—</div>
+      <div class="winner" id="winner-name">—</div>
+      <div class="headline" id="winner-headline">—</div>
+      <div class="reasoning" id="winner-reasoning"></div>
+    </div>
+
+    <div class="card">
+      <h2>Per-axis comparison</h2>
+      <div class="axis-grid" id="axes"></div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card" id="card-a">
+        <h2><span class="label-pill" id="card-a-label">A</span> Aggregator verdict</h2>
+        <div class="score-card" id="score-a"></div>
+        <h2 style="margin-top: 18px">Specialist agents</h2>
+        <div class="agent-cards" id="agents-a"></div>
+      </div>
+      <div class="card" id="card-b">
+        <h2><span class="label-pill b" id="card-b-label">B</span> Aggregator verdict</h2>
+        <div class="score-card" id="score-b"></div>
+        <h2 style="margin-top: 18px">Specialist agents</h2>
+        <div class="agent-cards" id="agents-b"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>The videos you compared</h2>
+      <div class="video-pair-results">
+        <video id="result-video-a" controls preload="metadata"></video>
+        <video id="result-video-b" controls preload="metadata"></video>
+      </div>
+    </div>
+
+    <div class="cost-bar" id="cost-bar"></div>
+
+    <div style="margin-top: 20px; text-align: center;">
+      <button class="btn btn-secondary" id="restart-btn">Compare more videos</button>
+    </div>
+  </section>
+</main>
+
+<script>
+// ─── Stage labels ─────────────────────────────────────────────────────
+const STAGE_LABELS = {
+  queued: "Queued",
+  starting: "Starting up",
+  transcribing: "Transcribing audio",
+  extracting_frames: "Extracting keyframes",
+  detecting_characters: "Detecting characters",
+  stabilising: "Stabilising background",
+  running_agents: "Running specialist agents",
+  running_lipsync: "Analysing lip sync",
+  running_pvc: "Comparing prompt to caption",
+  aggregating: "Aggregating final verdict",
+  done: "Complete",
+};
+
+// Approximate completion times per stage (seconds, cheap mode).
+// Used for the overall elapsed/ETA display only — not actual pacing.
+const EXPECTED_PER_VIDEO_S = 80;
+
+// ─── Element refs ────────────────────────────────────────────────────
+const $ = (id) => document.getElementById(id);
+const upload = $('upload-view');
+const progressView = $('progress-view');
+const resultsView = $('results-view');
+const submitBtn = $('submit-btn');
+const submitErr = $('submit-error');
+const modeEl = $('mode');
+const acceptCostEl = $('accept-cost');
+const maxSpendEl = $('max-spend');
+const costFields = $('cost-fields');
+
+let pollHandle = null;
+let pollStart = null;
+
+// ─── Pickers + previews ──────────────────────────────────────────────
+function setupPicker(slot) {
+  const wrapper = document.querySelector(`.video-slot[data-slot="${slot}"]`);
+  const picker = wrapper.querySelector('.picker');
+  const fileInput = wrapper.querySelector('input[type=file]');
+  const preview = wrapper.querySelector('.preview');
+  const videoEl = preview.querySelector('video');
+  const filenameEl = preview.querySelector('.filename');
+  const changeBtn = preview.querySelector('.change-btn');
+
+  picker.addEventListener('click', () => fileInput.click());
+
+  // drag & drop
+  picker.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    picker.style.borderColor = 'var(--accent)';
+  });
+  picker.addEventListener('dragleave', () => {
+    picker.style.borderColor = '';
+  });
+  picker.addEventListener('drop', (e) => {
+    e.preventDefault();
+    picker.style.borderColor = '';
+    if (e.dataTransfer.files.length > 0) {
+      fileInput.files = e.dataTransfer.files;
+      fileInput.dispatchEvent(new Event('change'));
+    }
+  });
+
+  fileInput.addEventListener('change', () => {
+    const f = fileInput.files[0];
+    if (!f) return;
+    videoEl.src = URL.createObjectURL(f);
+    filenameEl.textContent = f.name + ' · ' + formatBytes(f.size);
+    picker.classList.add('hidden');
+    preview.classList.remove('hidden');
+  });
+
+  changeBtn.addEventListener('click', () => {
+    fileInput.value = '';
+    URL.revokeObjectURL(videoEl.src);
+    videoEl.src = '';
+    picker.classList.remove('hidden');
+    preview.classList.add('hidden');
+  });
+}
+setupPicker('a'); setupPicker('b');
+
+function formatBytes(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB';
+  return (b / 1024 / 1024).toFixed(1) + ' MB';
+}
+
+// ─── Mode-conditional UI ─────────────────────────────────────────────
+modeEl.addEventListener('change', () => {
+  const expensive = (modeEl.value === 'pro' || modeEl.value === 'max');
+  costFields.classList.toggle('hidden', !expensive);
+});
+
+// ─── Submit ──────────────────────────────────────────────────────────
+submitBtn.addEventListener('click', async () => {
+  submitErr.classList.add('hidden');
+
+  const fa = $('video-a').files[0];
+  const fb = $('video-b').files[0];
+  if (!fa || !fb) {
+    showSubmitError('Please pick both videos before submitting.');
+    return;
+  }
+  const fd = new FormData();
+  fd.append('video_a', fa);
+  fd.append('video_b', fb);
+  fd.append('mode', modeEl.value);
+  fd.append('prompt_a', $('prompt-a').value);
+  fd.append('prompt_b', $('prompt-b').value);
+  fd.append('label_a', $('label-a').value || 'A');
+  fd.append('label_b', $('label-b').value || 'B');
+  fd.append('accept_cost', acceptCostEl.checked ? 'true' : 'false');
+  if (maxSpendEl.value) fd.append('max_spend_usd', maxSpendEl.value);
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Uploading…';
+
+  let resp;
+  try {
+    resp = await fetch('/jobs', { method: 'POST', body: fd });
+  } catch (e) {
+    showSubmitError('Network error: ' + e);
+    resetSubmit(); return;
+  }
+  if (!resp.ok) {
+    const body = await resp.text();
+    let detail = body;
+    try { detail = JSON.parse(body).detail || body; } catch {}
+    showSubmitError(`HTTP ${resp.status}: ${detail}`);
+    resetSubmit(); return;
+  }
+  const { job_id } = await resp.json();
+
+  // Switch to progress view, mirror video previews.
+  upload.classList.add('hidden');
+  progressView.classList.remove('hidden');
+  $('progress-job-id').textContent = job_id;
+  pollStart = Date.now();
+  startPolling(job_id, fa, fb);
+});
+
+function showSubmitError(msg) {
+  submitErr.textContent = msg;
+  submitErr.classList.remove('hidden');
+}
+function resetSubmit() {
+  submitBtn.disabled = false;
+  submitBtn.textContent = 'Compare videos';
+}
+
+// ─── Polling + progress rendering ────────────────────────────────────
+// Side-panel shells (static structure with a single video element each) are
+// built ONCE per run and reused; only the dynamic block inside is replaced
+// on each poll tick. Re-creating the <video> element each tick triggers the
+// browser's native re-buffering spinner — looks like the upload is still
+// in flight forever.
+const sideObjectUrls = { a: null, b: null };
+
+function startPolling(jobId, fileA, fileB) {
+  const labelA = $('label-a').value || 'A';
+  const labelB = $('label-b').value || 'B';
+  buildSideShell('a', labelA, fileA);
+  buildSideShell('b', labelB, fileB);
+
+  // Poll resilience: a transient 5xx (e.g. write/read race on the status
+  // file) shouldn't stop polling. We tolerate up to MAX_TRANSIENT consecutive
+  // failures, then surface an error. 404 is treated as fatal (job vanished).
+  let transientFailures = 0;
+  const MAX_TRANSIENT = 8;  // ~12s of 1.5s polls before giving up
+
+  const tick = async () => {
+    let s;
+    try {
+      const r = await fetch('/jobs/' + jobId);
+      if (r.status === 404) {
+        showProgressError(`Job ${jobId} not found on server.`);
+        clearInterval(pollHandle); pollHandle = null;
+        return;
+      }
+      if (!r.ok) {
+        transientFailures += 1;
+        if (transientFailures >= MAX_TRANSIENT) {
+          showProgressError(`Polling failed: HTTP ${r.status} after ${transientFailures} retries.`);
+          clearInterval(pollHandle); pollHandle = null;
+        }
+        // Otherwise: clear any old error, keep going.
+        $('progress-error').classList.add('hidden');
+        return;
+      }
+      s = await r.json();
+      transientFailures = 0;
+      $('progress-error').classList.add('hidden');
+    } catch (e) {
+      transientFailures += 1;
+      if (transientFailures >= MAX_TRANSIENT) {
+        showProgressError(`Network error during polling: ${e}`);
+        clearInterval(pollHandle); pollHandle = null;
+      }
+      return;
+    }
+    renderProgress(s, fileA, fileB, labelA, labelB);
+    if (s.status === 'done') {
+      clearInterval(pollHandle); pollHandle = null;
+      renderResults(s, fileA, fileB, labelA, labelB);
+      progressView.classList.add('hidden');
+      resultsView.classList.remove('hidden');
+    } else if (s.status === 'failed') {
+      clearInterval(pollHandle); pollHandle = null;
+      showProgressError(s.error || 'Run failed.');
+    }
+  };
+  tick();
+  pollHandle = setInterval(tick, 1500);
+}
+
+function showProgressError(msg) {
+  const e = $('progress-error');
+  e.textContent = msg;
+  e.classList.remove('hidden');
+}
+
+function renderProgress(s, fileA, fileB, labelA, labelB) {
+  const overallElapsed = Math.round((Date.now() - pollStart) / 1000);
+  $('elapsed-overall').textContent = overallElapsed + 's';
+
+  const stages = [];
+  const a = (s.progress || {}).a || {}; const b = (s.progress || {}).b || {};
+  const cmp = (s.progress || {}).comparator || {};
+  if (a.stage) stages.push(a.stage);
+  if (b.stage) stages.push(b.stage);
+  if (cmp.status === 'running') stages.push('comparing');
+  if (cmp.status === 'done') stages.push('done');
+  let overall = 'Running…';
+  if (cmp.status === 'running') overall = 'Comparing the two reports';
+  else if (a.stage === 'done' && b.stage === 'done') overall = 'Both videos analysed — running comparator';
+  else if (stages.length) {
+    // Pick the most "interesting" stage for the badge
+    const ordered = ['transcribing', 'extracting_frames', 'detecting_characters',
+                     'stabilising', 'running_lipsync', 'running_agents',
+                     'running_pvc', 'aggregating', 'done'];
+    const minIdx = Math.min(...stages.map(st => {
+      const i = ordered.indexOf(st);
+      return i === -1 ? 0 : i;
+    }));
+    overall = STAGE_LABELS[ordered[minIdx]] || ordered[minIdx];
+  }
+  $('overall-stage').textContent = overall;
+
+  updateSideDynamic('a', a);
+  updateSideDynamic('b', b);
+
+  if (cmp.status === 'running' || cmp.status === 'done') {
+    $('comparator-progress').classList.remove('hidden');
+    const cmpDone = cmp.status === 'done';
+    // Avoid replacing innerHTML if class is already correct — keeps animations stable.
+    const want = cmpDone ? 'comparator-done' : 'comparator-running';
+    if ($('comparator-progress').dataset.state !== want) {
+      $('comparator-progress').dataset.state = want;
+      $('comparator-progress').innerHTML = `
+        <div class="stage-badge ${cmpDone ? 'complete' : ''}">
+          <span class="dot"></span>
+          ${cmpDone ? 'Comparator complete' : 'Running comparator…'}
+        </div>`;
+    }
+  }
+}
+
+function buildSideShell(slot, label, file) {
+  // Revoke any URL from a previous run to avoid leaks.
+  if (sideObjectUrls[slot]) { URL.revokeObjectURL(sideObjectUrls[slot]); sideObjectUrls[slot] = null; }
+  const fileUrl = file ? URL.createObjectURL(file) : '';
+  if (file) sideObjectUrls[slot] = fileUrl;
+  const fileName = file ? `${escapeHtml(file.name)} · ${formatBytes(file.size)}` : '';
+  const target = $(`side-${slot}-progress`);
+  target.innerHTML = `
+    <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px;">
+      <span class="label-pill ${slot === 'b' ? 'b' : ''}">${escapeHtml(label)}</span>
+      <span style="color: var(--muted); font-size: 12px;">${fileName}</span>
+    </div>
+    ${file ? `<video src="${fileUrl}" controls preload="metadata"
+        style="width: 100%; max-height: 160px; background: #000; border-radius: 8px; margin-bottom: 12px;"></video>` : ''}
+    <div data-slot="${slot}-dyn" class="side-dynamic"></div>
+  `;
+}
+
+function updateSideDynamic(slot, side) {
+  const target = document.querySelector(`[data-slot="${slot}-dyn"]`);
+  if (!target) return;
+  const stage = side.stage || 'queued';
+  const elapsed = Math.round(side.elapsed_s || 0);
+  const remaining = Math.max(0, EXPECTED_PER_VIDEO_S - elapsed);
+  const isDone = stage === 'done';
+
+  const agents = side.agents || {};
+  const agentEntries = Object.entries(agents);
+  const agentItems = agentEntries.map(([id, a]) => {
+    const status = a.status || 'queued';
+    const verdict = a.verdict || '';
+    const cls = `${status}${verdict ? ' ' + verdict.replace('_issues', '') : ''}`;
+    const iconChar = status === 'done'
+      ? (verdict === 'great' ? '✓' : verdict === 'minor_issues' ? '!' : verdict === 'major_issues' ? '✗' : '✓')
+      : status === 'running' ? '◴' : '·';
+    const verdictText = status === 'done'
+      ? (verdict === 'great' ? 'good' : verdict === 'minor_issues' ? 'minor' : verdict === 'major_issues' ? 'major' : '')
+      : (status === 'running' ? 'running' : '');
+    return `<li class="${cls}">
+      <div class="icon">${iconChar}</div>
+      <div class="title">${escapeHtml(a.title || id)}</div>
+      <div class="verdict-text">${verdictText}</div>
+    </li>`;
+  }).join('');
+
+  target.innerHTML = `
+    <div class="stage-badge ${isDone ? 'complete' : ''}">
+      <span class="dot"></span>
+      ${STAGE_LABELS[stage] || stage}
+    </div>
+    <div class="timer" style="margin-bottom: 12px;">
+      elapsed <span class="num">${elapsed}s</span>
+      ${isDone ? '' : `<span style="color: var(--dim)">·</span> ~ <span class="num">${remaining}s</span> remaining`}
+      <span style="color: var(--dim)">·</span>
+      <span class="num">${agentEntries.filter(([,a]) => a.status === 'done').length}</span> / ${agentEntries.length || '?'} agents
+    </div>
+    <ul class="agent-list">${agentItems}</ul>
+  `;
+}
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// ─── Results rendering ───────────────────────────────────────────────
+function renderResults(s, fileA, fileB, labelA, labelB) {
+  const cmp = s.comparison || {};
+
+  // Winner card
+  const winnerEl = $('winner-name');
+  winnerEl.classList.remove('A', 'B', 'tie');
+  if (cmp.winner === labelA || cmp.winner === 'A') {
+    winnerEl.textContent = `${labelA} wins`;
+    winnerEl.classList.add('A');
+  } else if (cmp.winner === labelB || cmp.winner === 'B') {
+    winnerEl.textContent = `${labelB} wins`;
+    winnerEl.classList.add('B');
+  } else {
+    winnerEl.textContent = 'It\'s a tie';
+    winnerEl.classList.add('tie');
+  }
+  $('winner-confidence').textContent = `${cmp.confidence || 'low'} confidence`;
+  $('winner-headline').textContent = cmp.headline || '';
+  $('winner-reasoning').textContent = cmp.reasoning || '';
+
+  // Per-axis grid
+  const axes = cmp.per_axis || {};
+  const AXIS_NAMES = {
+    prompt_fidelity: 'Prompt fidelity',
+    rendering: 'Rendering',
+    face_uncanny: 'Face / uncanny',
+    character_consistency: 'Character consistency',
+    motion: 'Motion',
+    environment: 'Environment',
+    audio: 'Audio',
+    lipsync: 'Lip sync',
+  };
+  $('axes').innerHTML = Object.entries(axes).map(([k, winner]) => {
+    const cls = (winner === labelA || winner === 'A') ? 'A' :
+                (winner === labelB || winner === 'B') ? 'B' : 'tie';
+    const display = (winner === 'tie') ? '— tie —' : winner;
+    return `<div class="axis-cell">
+      <div class="axis-name">${AXIS_NAMES[k] || k.replace(/_/g, ' ')}</div>
+      <div class="axis-winner ${cls}">${escapeHtml(display)}</div>
+    </div>`;
+  }).join('');
+
+  // Per-video aggregator + agents
+  $('card-a-label').textContent = labelA;
+  $('card-b-label').textContent = labelB;
+  renderSideResults('a', s.report_a, labelA);
+  renderSideResults('b', s.report_b, labelB);
+
+  // Video previews
+  if (fileA) $('result-video-a').src = URL.createObjectURL(fileA);
+  if (fileB) $('result-video-b').src = URL.createObjectURL(fileB);
+
+  // Cost
+  const cost = s.cost || {};
+  const byModel = Object.entries(cost.by_model || {}).map(([m, v]) =>
+    `${m}: $${(v || 0).toFixed(4)}`
+  ).join(' · ');
+  $('cost-bar').innerHTML = `
+    <div>Total cost: <span class="total">$${(cost.total_usd || 0).toFixed(4)}</span></div>
+    <div>${cost.calls || 0} model calls</div>
+    <div>${(cost.input_tokens || 0).toLocaleString()} input · ${(cost.output_tokens || 0).toLocaleString()} output tokens</div>
+    <div style="color: var(--dim)">${byModel}</div>
+  `;
+}
+
+function renderSideResults(slot, report, label) {
+  if (!report) return;
+  const agg = report.aggregator || {};
+  const score = +(agg.score || 0);
+  const verdict = agg.overall_verdict || 'FAIL';
+  const gaugeColor =
+    verdict === 'PASS' ? 'var(--good)' :
+    verdict === 'CONDITIONAL_PASS' ? 'var(--warn)' :
+    'var(--bad)';
+  $(`score-${slot}`).innerHTML = `
+    <div class="score-gauge" style="--score: ${score}; --gauge-color: ${gaugeColor}">
+      <span>${score}</span>
+    </div>
+    <div class="score-info">
+      <div class="score-verdict ${verdict}">${verdict.replace('_', ' ')}</div>
+      <div class="score-headline">${escapeHtml(agg.headline || '')}</div>
+    </div>
+  `;
+
+  const agents = report.agents || [];
+  const sorted = [...agents].sort((a, b) => {
+    const order = { major_issues: 0, minor_issues: 1, great: 2 };
+    return (order[a.verdict] ?? 3) - (order[b.verdict] ?? 3);
+  });
+  $(`agents-${slot}`).innerHTML = sorted.map(a => {
+    const cls = a.verdict === 'great' ? 'great' :
+                a.verdict === 'minor_issues' ? 'minor' :
+                a.verdict === 'major_issues' ? 'major' : '';
+    const verdictText = a.verdict === 'great' ? 'GOOD' :
+                        a.verdict === 'minor_issues' ? 'MINOR' :
+                        a.verdict === 'major_issues' ? 'MAJOR' : '?';
+    return `<div class="ac ${cls}">
+      <div class="ac-head">
+        <div class="ac-title">${escapeHtml(a.title || a.agent_id)}</div>
+        <div class="ac-verdict">${verdictText}</div>
+      </div>
+      <div class="ac-summary">${escapeHtml(a.summary || '')}</div>
+      ${a.findings ? `<details><summary>Read full findings</summary>
+        <div class="findings">${escapeHtml(a.findings)}</div>
+      </details>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// ─── Restart ─────────────────────────────────────────────────────────
+$('restart-btn').addEventListener('click', () => {
+  resultsView.classList.add('hidden');
+  upload.classList.remove('hidden');
+  resetSubmit();
+  if (pollHandle) { clearInterval(pollHandle); pollHandle = null; }
+});
+</script>
+</body>
+</html>

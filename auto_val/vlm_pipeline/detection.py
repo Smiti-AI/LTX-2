@@ -17,17 +17,14 @@ import concurrent.futures as cf
 import io
 import json
 import re
-import threading
 from dataclasses import dataclass, asdict
 from typing import List, Optional, Tuple
 
-from google import genai
 from google.genai import types
 from loguru import logger
 from PIL import Image
 
-
-FLASH_MODEL = "gemini-2.5-flash"
+from .core import ModelRole, RunContext, call_model
 
 
 @dataclass
@@ -38,26 +35,6 @@ class CharacterBbox:
 
     def to_dict(self) -> dict:
         return asdict(self)
-
-
-# Share the Pro client's connection pool — genai.Client handles both models.
-_cached_client: Optional[genai.Client] = None
-_client_lock = threading.Lock()
-
-
-def _client() -> genai.Client:
-    global _cached_client
-    if _cached_client is not None:
-        return _cached_client
-    with _client_lock:
-        if _cached_client is None:
-            import os
-            _cached_client = genai.Client(
-                vertexai=True,
-                project=os.environ.get("GOOGLE_CLOUD_PROJECT", "shapeshifter-459611"),
-                location=os.environ.get("GOOGLE_CLOUD_LOCATION", "global"),
-            )
-    return _cached_client
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -133,8 +110,15 @@ def _parse_bboxes(text: str, img_w: int, img_h: int) -> List[CharacterBbox]:
 _DETECT_MAX_WIDTH = 512  # downscale before sending — normalised bboxes are resolution-agnostic
 
 
-def detect_in_frame(frame_pil: Image.Image) -> List[CharacterBbox]:
-    """Detect characters in a single frame. Returns possibly-empty list."""
+def detect_in_frame(frame_pil: Image.Image, *, ctx: RunContext) -> List[CharacterBbox]:
+    """Detect characters in a single frame. Returns possibly-empty list.
+
+    In mock mode this returns an empty list without touching the network —
+    downstream code already handles the no-character fallback.
+    """
+    if ctx.is_mock:
+        return []
+
     orig_w, orig_h = frame_pil.size
 
     # Resize for transport — Flash latency is dominated by input size
@@ -151,8 +135,10 @@ def detect_in_frame(frame_pil: Image.Image) -> List[CharacterBbox]:
     small.save(buf, format="JPEG", quality=80)
     img_bytes = buf.getvalue()
     try:
-        resp = _client().models.generate_content(
-            model=FLASH_MODEL,
+        resp = call_model(
+            ctx=ctx,
+            role=ModelRole.DETECTION,
+            agent_id="detection::frame",
             contents=[
                 types.Part.from_bytes(data=img_bytes, mime_type="image/jpeg"),
                 _DETECTION_PROMPT,
@@ -173,11 +159,21 @@ def detect_in_frame(frame_pil: Image.Image) -> List[CharacterBbox]:
 def detect_batch(
     frames: List[Tuple[float, Image.Image]],
     max_workers: int = 6,
+    *,
+    ctx: RunContext,
 ) -> List[List[CharacterBbox]]:
-    """Run detect_in_frame over N frames in parallel. Order-preserving output."""
+    """Run detect_in_frame over N frames in parallel. Order-preserving output.
+
+    In mock mode returns empty bboxes for every frame without spawning workers."""
+    if ctx.is_mock:
+        return [[] for _ in frames]
+
     results: List[List[CharacterBbox]] = [[] for _ in frames]
     with cf.ThreadPoolExecutor(max_workers=max_workers) as pool:
-        futs = {pool.submit(detect_in_frame, img): i for i, (_, img) in enumerate(frames)}
+        futs = {
+            pool.submit(detect_in_frame, img, ctx=ctx): i
+            for i, (_, img) in enumerate(frames)
+        }
         for f in cf.as_completed(futs):
             i = futs[f]
             try:
@@ -192,6 +188,65 @@ def detect_batch(
 # Helpers for downstream grid composition
 # ─────────────────────────────────────────────────────────────────────────────
 
+def consolidate_character_names(raw_names: List[str], *, ctx: RunContext) -> dict:
+    """
+    Gemini-Flash-driven name consolidation. Across N frames, the detector
+    may describe the same character with slight variations ("pink dog",
+    "pink aviator pup", "pink puppy"). This collapses those into canonical
+    names so downstream per-character grouping is stable.
+
+    Returns a dict mapping each raw name → its canonical form. In mock mode
+    or on failure / trivial input, returns an identity mapping.
+    """
+    unique = sorted(set(n.strip() for n in raw_names if n and n.strip()))
+    if len(unique) <= 1 or ctx.is_mock:
+        return {n: n for n in unique}
+
+    prompt = (
+        "Below is a list of character descriptions detected across different "
+        "frames of the same short video. Multiple descriptions may refer to "
+        "the SAME character (e.g. 'pink dog', 'pink aviator pup', 'pink puppy' "
+        "are all one character). Group them by identity and return a JSON "
+        "object mapping each input string to a short canonical name.\n\n"
+        "Rules:\n"
+        "- Canonical name is a short, distinctive label (e.g. 'pink dog', "
+        "  'blue police dog', 'red robot', 'human girl').\n"
+        "- If two descriptions refer to clearly different characters, give "
+        "  them different canonical names.\n"
+        "- Respond with JSON only, no prose. Example:\n"
+        '  {"pink dog": "pink dog", "pink aviator pup": "pink dog", '
+        '"blue police dog": "blue police dog"}\n\n'
+        f"Input descriptions: {json.dumps(unique)}"
+    )
+    try:
+        resp = call_model(
+            ctx=ctx,
+            role=ModelRole.DETECTION,
+            agent_id="detection::name_consolidation",
+            contents=[prompt],
+            config=types.GenerateContentConfig(
+                temperature=0.0,
+                response_mime_type="application/json",
+                http_options=types.HttpOptions(timeout=60_000),
+            ),
+        )
+        text = (resp.text or "").strip()
+        m = re.search(r"\{.*\}", text, re.DOTALL)
+        if m:
+            text = m.group(0)
+        mapping = json.loads(text)
+        if not isinstance(mapping, dict):
+            return {n: n for n in unique}
+        out = {}
+        for raw in unique:
+            canonical = mapping.get(raw, raw)
+            out[raw] = str(canonical).strip() or raw
+        return out
+    except Exception as exc:
+        logger.warning(f"Character-name consolidation failed: {exc} — using raw names")
+        return {n: n for n in unique}
+
+
 def largest_body_bbox(bboxes: List[CharacterBbox]) -> Optional[Tuple[int, int, int, int]]:
     """Pick the bbox with the largest area — heuristic for 'primary character'."""
     if not bboxes:
@@ -205,6 +260,28 @@ def largest_face_bbox(bboxes: List[CharacterBbox]) -> Optional[Tuple[int, int, i
         return None
     primary = max(bboxes, key=lambda b: (b.body[2] - b.body[0]) * (b.body[3] - b.body[1]))
     return primary.face
+
+
+def eye_region_from_face(
+    face_bbox: Tuple[int, int, int, int],
+    frame_w: int,
+    frame_h: int,
+) -> Tuple[int, int, int, int]:
+    """
+    Given a face bbox, return a bbox cropped to just the EYE region:
+    upper 55% of the face, horizontally inset 5%. This gives the facial-
+    topology audit 3-5× more pixels on the actual eye structure than the
+    whole-face crop, which is what aspect-ratio and curvature analysis needs.
+    """
+    x1, y1, x2, y2 = face_bbox
+    w, h = x2 - x1, y2 - y1
+    ex1 = max(0,        int(x1 + 0.05 * w))
+    ex2 = min(frame_w,  int(x2 - 0.05 * w))
+    ey1 = max(0,        int(y1 + 0.15 * h))  # skip forehead
+    ey2 = min(frame_h,  int(y1 + 0.65 * h))  # stop before nose/mouth
+    if ex2 - ex1 < 10 or ey2 - ey1 < 10:
+        return face_bbox
+    return (ex1, ey1, ex2, ey2)
 
 
 def crop_with_padding(

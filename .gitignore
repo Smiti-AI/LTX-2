@@ -14,11 +14,15 @@ checkpoints/
 # IDE settings
 .idea/
 .vscode/
+.claude/
 
 # Other files
 .DS_Store
 tmp
 .wandb
+
+# Hidden tempfiles from interrupted gcs/gsutil downloads (.<name>.mp4.<rand>)
+**/.*.mp4.*
 
 # Model checkpoints
 *.ckpt

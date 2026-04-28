@@ -47,6 +47,9 @@ def parse_args() -> argparse.Namespace:
                    help="Scene folder name under BM_v1_<model>/<scene>/")
     p.add_argument("--out-dir", default=None,
                    help="Output root. Defaults to outputs_vlm_compare_<scene>/")
+    p.add_argument("--suffix", default="",
+                   help="Suffix appended to the default output folder "
+                        "(e.g. '__flash' → outputs_vlm_compare_<scene>__flash/).")
     p.add_argument("--enable-prompt-reasoning", action="store_true",
                    help="Forward --enable-prompt-reasoning to each per-model run.")
     return p.parse_args()
@@ -55,7 +58,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     scene = args.scene
-    out = Path(args.out_dir) if args.out_dir else REPO / f"outputs_vlm_compare_{scene}"
+    out = Path(args.out_dir) if args.out_dir else REPO / f"outputs_vlm_compare_{scene}{args.suffix}"
     _reset(out)
 
     # Ensure the viewer is in place

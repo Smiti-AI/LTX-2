@@ -1,6 +1,6 @@
 """
-Agents — nine specialist VLM evaluators. Each is a single Gemini 2.5 Pro call
-on the native video plus optional evidence images / text context.
+Agents — specialist VLM evaluators. Each is a single Gemini call on the
+native video plus optional evidence images / text context.
 
 Design:
 - Every agent receives the full .mp4 so Gemini hears audio and sees all frames.
@@ -8,21 +8,28 @@ Design:
   because static side-by-side panels defeat the VLM's playback-averaging bias.
 - Every agent has a narrow scope, anti-hallucination guards, and defaults to
   `great` when no defect is observed.
+
+Every paid call goes through `core.llm.call_model` — the chokepoint that
+enforces mode-based model selection and records cost. Public functions take
+`ctx: RunContext` as a keyword-only argument; the runner in `run.py` builds
+one RunContext per video and passes it through.
 """
 from __future__ import annotations
 
 import json
-import os
 import re
-import threading
 import time
 from dataclasses import dataclass, asdict
 from typing import Optional
 
-from google import genai
 from google.genai import types
 
-MODEL_ID = "gemini-2.5-pro"
+from .core import (
+    ModelRole,
+    RunContext,
+    call_model,
+)
+from .core.llm import prewarm_client  # re-exported for run.py
 
 
 @dataclass
@@ -37,31 +44,6 @@ class AgentReport:
 
     def to_dict(self) -> dict:
         return asdict(self)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Shared Gemini client
-# ─────────────────────────────────────────────────────────────────────────────
-
-_PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT", "shapeshifter-459611")
-_LOCATION = os.environ.get("GOOGLE_CLOUD_LOCATION", "global")
-
-_cached_client: Optional[genai.Client] = None
-_client_lock = threading.Lock()
-
-
-def _client() -> genai.Client:
-    global _cached_client
-    if _cached_client is not None:
-        return _cached_client
-    with _client_lock:
-        if _cached_client is None:
-            _cached_client = genai.Client(vertexai=True, project=_PROJECT, location=_LOCATION)
-    return _cached_client
-
-
-def prewarm_client() -> None:
-    _client()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -102,6 +84,10 @@ def _call(
     extra_text: str = "",
     image_bytes: Optional[bytes] = None,
     image_caption: str = "",
+    *,
+    ctx: RunContext,
+    role: ModelRole,
+    agent_id: str,
 ) -> dict:
     parts: list = [types.Part.from_bytes(data=video_bytes, mime_type="video/mp4")]
     if image_bytes is not None:
@@ -113,28 +99,18 @@ def _call(
         body += "\n\n=== ADDITIONAL CONTEXT ===\n" + extra_text
     parts.append(body)
 
-    last_exc = None
-    for attempt in range(3):
-        try:
-            resp = _client().models.generate_content(
-                model=MODEL_ID,
-                contents=parts,
-                config=types.GenerateContentConfig(
-                    temperature=0.1,
-                    response_mime_type="application/json",
-                    http_options=types.HttpOptions(timeout=240_000),
-                ),
-            )
-            return _parse_json((resp.text or "").strip())
-        except Exception as exc:
-            last_exc = exc
-            msg = str(exc)
-            if any(code in msg for code in ("499", "503", "504", "CANCELLED", "UNAVAILABLE", "DEADLINE")):
-                if attempt < 2:
-                    time.sleep(2 ** attempt)
-                    continue
-            raise
-    raise last_exc
+    resp = call_model(
+        ctx=ctx,
+        role=role,
+        agent_id=agent_id,
+        contents=parts,
+        config=types.GenerateContentConfig(
+            temperature=0.1,
+            response_mime_type="application/json",
+            http_options=types.HttpOptions(timeout=240_000),
+        ),
+    )
+    return _parse_json((resp.text or "").strip())
 
 
 def _parse_json(text: str) -> dict:
@@ -162,9 +138,15 @@ def _parse_json(text: str) -> dict:
     }
 
 
-def _run(agent_id, title, prompt, video_bytes, extra="", image_bytes=None, image_caption=""):
+def _run(
+    agent_id, title, prompt, video_bytes, extra="", image_bytes=None,
+    image_caption="", *, ctx: RunContext, role: ModelRole,
+):
     t0 = time.time()
-    data = _call(prompt, video_bytes, extra, image_bytes, image_caption)
+    data = _call(
+        prompt, video_bytes, extra, image_bytes, image_caption,
+        ctx=ctx, role=role, agent_id=agent_id,
+    )
     return AgentReport(
         agent_id=agent_id,
         title=title,
@@ -180,13 +162,19 @@ def _run(agent_id, title, prompt, video_bytes, extra="", image_bytes=None, image
 # Agent 1 — Body Consistency
 # ─────────────────────────────────────────────────────────────────────────────
 
-def run_body_consistency(video_bytes: bytes, body_grid: bytes) -> AgentReport:
-    prompt = """
-You are a continuity supervisor. Your scope is the CHARACTER BODY ONLY —
-NOT faces, NOT motion, NOT lip-sync.
+def run_body_consistency(
+    video_bytes: bytes,
+    body_grid: bytes,
+    character_name: str = "the primary character",
+    *,
+    ctx: RunContext,
+) -> AgentReport:
+    prompt = f"""
+You are a continuity supervisor. Your scope is the CHARACTER BODY ONLY
+for **{character_name}** — NOT faces, NOT motion, NOT lip-sync.
 
 You have the full video AND a 4×4 BODY-CROP GRID (16 panels, each cropped
-to the primary character's body). Compare panel-by-panel:
+to **{character_name}**'s body across the clip). Compare panel-by-panel:
 
 A. IDENTITY CONSISTENCY — Is the SAME character in every panel? Species,
    body shape, fur / skin color, clothing, accessories (vest, badge, hat,
@@ -205,25 +193,38 @@ Out of scope: face quality (separate agent), eyes (separate agent), lip-sync
 
 If no identity or anatomy defects, verdict 'great'.
 """.strip()
-    return _run(
-        "body_consistency",
-        "Body Consistency",
+    agent_id = f"body_consistency::{character_name}"
+    title = f"Body Consistency — {character_name}"
+    r = _run(
+        agent_id,
+        title,
         prompt,
         video_bytes,
         image_bytes=body_grid,
-        image_caption="BODY-CROP GRID — 16 panels, each cropped to the primary character's body (panels numbered 1-16):",
+        image_caption=f"BODY-CROP GRID — 16 panels of {character_name}'s body (panels 1-16):",
+        ctx=ctx,
+        role=ModelRole.CHARACTER_AGENT,
     )
+    r.focus = f"Body consistency for {character_name}"
+    return r
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Agent 2 — Face & Uncanny Valley
 # ─────────────────────────────────────────────────────────────────────────────
 
-def run_face_uncanny(video_bytes: bytes, face_grid: bytes) -> AgentReport:
-    prompt = """
+def run_face_uncanny(
+    video_bytes: bytes,
+    face_grid: bytes,
+    character_name: str = "the primary character",
+    *,
+    ctx: RunContext,
+) -> AgentReport:
+    prompt = f"""
 You are a character-animation director specialising in FACIAL performance.
-Your scope is the FACE only. Use the provided 4×4 FACE-CROP GRID (16 panels,
-each tightly zoomed on the character's face across the clip) plus the video.
+Your scope is the FACE of **{character_name}** only. Use the provided 4×4
+FACE-CROP GRID (16 panels, each tightly zoomed on **{character_name}**'s
+face across the clip) plus the video.
 
 Evaluate the face on four dimensions:
 
@@ -249,21 +250,27 @@ to miss by saying "looks fine."
 
 If the face is alive, expressive, and anatomically stable, verdict 'great'.
 """.strip()
-    return _run(
-        "face_uncanny",
-        "Face & Uncanny Valley",
+    agent_id = f"face_uncanny::{character_name}"
+    title = f"Face & Uncanny Valley — {character_name}"
+    r = _run(
+        agent_id,
+        title,
         prompt,
         video_bytes,
         image_bytes=face_grid,
-        image_caption="FACE-CROP GRID — 16 panels, each tightly cropped to the primary character's face (panels numbered 1-16):",
+        image_caption=f"FACE-CROP GRID — 16 panels of {character_name}'s face (panels 1-16):",
+        ctx=ctx,
+        role=ModelRole.CHARACTER_AGENT,
     )
+    r.focus = f"Face & uncanny-valley for {character_name}"
+    return r
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Agent 3 — Motion & Weight
 # ─────────────────────────────────────────────────────────────────────────────
 
-def run_motion_weight(video_bytes: bytes) -> AgentReport:
+def run_motion_weight(video_bytes: bytes, *, ctx: RunContext) -> AgentReport:
     prompt = """
 You are a motion-quality reviewer. Your scope is HOW THINGS MOVE.
 
@@ -280,14 +287,19 @@ non-stylised motion glitches count.
 
 If motion looks intentional and coherent, verdict 'great'.
 """.strip()
-    return _run("motion_weight", "Motion & Weight", prompt, video_bytes)
+    return _run(
+        "motion_weight", "Motion & Weight", prompt, video_bytes,
+        ctx=ctx, role=ModelRole.SCENE_AGENT,
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Agent 4 — Environment Stability
 # ─────────────────────────────────────────────────────────────────────────────
 
-def run_environment_stability(video_bytes: bytes, keyframe_grid: bytes) -> AgentReport:
+def run_environment_stability(
+    video_bytes: bytes, keyframe_grid: bytes, *, ctx: RunContext,
+) -> AgentReport:
     prompt = """
 You are a world-permanence reviewer. Your scope is the BACKGROUND ONLY —
 ignore the characters entirely.
@@ -311,6 +323,8 @@ If the background is stable, verdict 'great'.
         video_bytes,
         image_bytes=keyframe_grid,
         image_caption="KEYFRAME GRID — 16 full-frame panels, evenly spaced, numbered 1-16:",
+        ctx=ctx,
+        role=ModelRole.SCENE_AGENT,
     )
 
 
@@ -318,7 +332,9 @@ If the background is stable, verdict 'great'.
 # Agent 5 — Rendering Defects
 # ─────────────────────────────────────────────────────────────────────────────
 
-def run_rendering_defects(video_bytes: bytes, keyframe_grid: bytes) -> AgentReport:
+def run_rendering_defects(
+    video_bytes: bytes, keyframe_grid: bytes, *, ctx: RunContext,
+) -> AgentReport:
     prompt = """
 You are a QC reviewer scanning for rendering artefacts. Your scope is
 FRAME-LEVEL RENDERING QUALITY. Use the 4×4 keyframe grid to inspect
@@ -343,6 +359,8 @@ If rendering is clean across all panels, verdict 'great'.
         video_bytes,
         image_bytes=keyframe_grid,
         image_caption="KEYFRAME GRID for rendering inspection (panels 1-16):",
+        ctx=ctx,
+        role=ModelRole.SCENE_AGENT,
     )
 
 
@@ -350,7 +368,7 @@ If rendering is clean across all panels, verdict 'great'.
 # Agent 6 — Audio Quality
 # ─────────────────────────────────────────────────────────────────────────────
 
-def run_audio_quality(video_bytes: bytes) -> AgentReport:
+def run_audio_quality(video_bytes: bytes, *, ctx: RunContext) -> AgentReport:
     prompt = """
 You are an audio-quality reviewer. You can hear the video's audio track.
 Scope: TECHNICAL audio quality only — NOT whether the words match the script
@@ -366,7 +384,10 @@ Evaluate:
 Quote any glitched phrase verbatim.
 If audio sounds clean and natural, verdict 'great'.
 """.strip()
-    return _run("audio_quality", "Audio Quality", prompt, video_bytes)
+    return _run(
+        "audio_quality", "Audio Quality", prompt, video_bytes,
+        ctx=ctx, role=ModelRole.SCENE_AGENT,
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -377,6 +398,8 @@ def run_lipsync_correspondence(
     video_bytes: bytes,
     speech_grid: Optional[bytes],
     speech_captions: list[str],
+    *,
+    ctx: RunContext,
 ) -> AgentReport:
     if not speech_grid:
         return AgentReport(
@@ -435,6 +458,8 @@ Chase=CLOSED/OPEN; caption 'Yee-haw!'; assessment: ..."
         video_bytes,
         image_bytes=speech_grid,
         image_caption="SPEECH-TIMESTAMP GRID (each row = one spoken line, LEFT=start frame, RIGHT=end frame):",
+        ctx=ctx,
+        role=ModelRole.SCENE_AGENT,
     )
 
 
@@ -446,6 +471,8 @@ def run_speech_coherence(
     video_bytes: bytes,
     transcript: str,
     segments_block: str,
+    *,
+    ctx: RunContext,
 ) -> AgentReport:
     """
     Evaluate the LINGUISTIC quality of the spoken dialogue: are the words
@@ -505,31 +532,26 @@ Quote exact phrases you critique. If the transcript is clean, verdict 'great'.
 {segments_block}
 """.strip()
 
-    # Flash-only call, no video — should return in 2-5s.
+    # Pure text reasoning — routed through TEXT_REASONING role (Flash in all
+    # paid modes; mock returns a stub).
     parts = [prompt + "\n\n" + _OUTPUT_CONTRACT]
     last_exc = None
     data = None
-    for attempt in range(3):
-        try:
-            resp = _client().models.generate_content(
-                model="gemini-2.5-flash",
-                contents=parts,
-                config=types.GenerateContentConfig(
-                    temperature=0.1,
-                    response_mime_type="application/json",
-                    http_options=types.HttpOptions(timeout=60_000),
-                ),
-            )
-            data = _parse_json((resp.text or "").strip())
-            break
-        except Exception as exc:
-            last_exc = exc
-            if any(code in str(exc) for code in ("499", "503", "504", "CANCELLED", "UNAVAILABLE", "DEADLINE")):
-                if attempt < 2:
-                    import time as _t2
-                    _t2.sleep(2 ** attempt)
-                    continue
-            break
+    try:
+        resp = call_model(
+            ctx=ctx,
+            role=ModelRole.TEXT_REASONING,
+            agent_id="speech_coherence",
+            contents=parts,
+            config=types.GenerateContentConfig(
+                temperature=0.1,
+                response_mime_type="application/json",
+                http_options=types.HttpOptions(timeout=60_000),
+            ),
+        )
+        data = _parse_json((resp.text or "").strip())
+    except Exception as exc:
+        last_exc = exc
 
     if data is None:
         return AgentReport(
@@ -554,10 +576,211 @@ Quote exact phrases you critique. If the transcript is clean, verdict 'great'.
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Facial Topology Audit — geometric / structural integrity of facial features
+#
+# This agent does NOT look at expressions, identity, or "feels alive". It
+# forces per-panel NUMERIC measurements (aspect ratio, shape descriptor,
+# upper-eyelid arc) on a character's EYE-CROP grid, then detects structural
+# morphs (e.g. an eye going round→almond over the clip) that the soft
+# "face quality" agents miss. Inspired by the Morphological Inconsistency
+# framing: compare the geometric skeleton, not the feeling.
+# ─────────────────────────────────────────────────────────────────────────────
+
+def run_facial_topology_audit(
+    video_bytes: bytes,
+    eye_grid: bytes,
+    character_name: str = "the primary character",
+    *,
+    ctx: RunContext,
+) -> AgentReport:
+    import time as _time
+    t0 = _time.time()
+
+    topology_prompt = f"""
+ROLE: You are a Facial Topology Analyst. Your scope is the geometric
+structural integrity of **{character_name}**'s eyes across time. You are
+NOT evaluating expression, mood, or animation quality. You are measuring
+SHAPES.
+
+You are given a grid of 24 panels, each a zoomed-in crop of
+{character_name}'s eye region at a different moment in the clip.
+
+STEP 1 — PER-PANEL NUMERIC MEASUREMENTS
+
+For each panel, report:
+  - aspect_ratio:  estimated WIDTH / HEIGHT of the visible eye opening.
+                   Scale: round/wide-open ≈ 1.0, oval ≈ 1.5, almond ≈ 2.0+,
+                   squinting ≈ 0.5, closed = 0.0. Use ONE eye (the more
+                   clearly visible one) CONSISTENTLY across all panels.
+  - shape:         one of {{"round", "oval", "almond", "angular", "closed", "unclear"}}
+  - eyelid_arc:    shape of the upper eyelid line. One of
+                   {{"smooth-convex", "flat", "angular", "inverted", "unclear"}}
+  - view_angle:    approximate viewing angle of the face. One of
+                   {{"frontal", "three_quarter", "profile", "above", "below", "unclear"}}
+
+Report EVERY panel. Use "unclear" only for genuine occlusion or extreme
+motion blur. Do not skip.
+
+STEP 2 — AGGREGATE ANALYSIS
+
+Compute:
+  - aspect_ratio_range:  max − min of aspect_ratio across panels where
+                          shape is neither "closed" nor "unclear".
+  - distinct_shapes:     the set of shape descriptors used, excluding
+                          "closed" (a blink) and "unclear".
+  - structural_morphs:   list of specific panel pairs where the shape
+                          changes between fundamentally different
+                          descriptors (e.g. "round" → "almond") AND the
+                          view_angle is similar (head-pose normalization
+                          rule: only compare same-angle panels).
+
+STEP 3 — VERDICT
+
+A genuine MORPHOLOGICAL INCONSISTENCY requires:
+  (a) Two or more panels at the SAME view_angle
+  (b) Eye is open in both (not blinking / squinting)
+  (c) The shape descriptor differs between them
+      OR the aspect_ratio differs by more than 0.7
+
+Blinks (closed → open) are NOT defects. Squinting / wide-eyed for
+emotional beats is NOT a defect (those are expression changes).
+What you flag is the underlying 3D-mesh shape CHANGING without cause.
+
+Verdict rules:
+  - "great": no morphological inconsistency found; eye shape is stable
+             across same-angle open-eye panels.
+  - "minor_issues": one suspicious transition at similar angles.
+  - "major_issues": multiple structural morphs or a clear start→end drift
+                    (e.g. Panel 1 = round, Panel 24 = almond, all frontal
+                    open-eye).
+
+RETURN EXACTLY THIS JSON SHAPE — nothing else:
+
+{{
+  "per_panel": [
+    {{"panel": 1, "aspect_ratio": 1.0, "shape": "round",
+      "eyelid_arc": "smooth-convex", "view_angle": "frontal"}},
+    ... (24 entries total) ...
+  ],
+  "aspect_ratio_range": <float>,
+  "distinct_shapes": ["round", ...],
+  "structural_morphs": [
+    {{"panel_a": 1, "panel_b": 18,
+      "observation": "Panel 1 was round (ratio 0.95) at frontal angle;
+                     panel 18 is almond (ratio 2.1) at frontal angle;
+                     structural shape change with no blink in between."}}
+  ],
+  "verdict": "great" | "minor_issues" | "major_issues",
+  "summary": "<one sentence>"
+}}
+
+Bias warning: this is NOT face recognition. You are not asked to confirm
+identity. You ARE asked whether a 3D character's eye-hole GEOMETRY stays
+structurally consistent. Treat the panels like engineering drawings.
+""".strip()
+
+    parts: list = [
+        types.Part.from_bytes(data=video_bytes, mime_type="video/mp4"),
+        f"EYE-CROP GRID for {character_name} — 24 panels, each zoomed to the eye region:",
+        types.Part.from_bytes(data=eye_grid, mime_type="image/png"),
+        topology_prompt,
+    ]
+
+    last_exc = None
+    data = None
+    try:
+        resp = call_model(
+            ctx=ctx,
+            role=ModelRole.CHARACTER_AGENT,
+            agent_id=f"facial_topology_audit::{character_name}",
+            contents=parts,
+            config=types.GenerateContentConfig(
+                temperature=0.0,
+                response_mime_type="application/json",
+                http_options=types.HttpOptions(timeout=240_000),
+            ),
+        )
+        text = (resp.text or "").strip()
+        m = re.search(r"\{.*\}", text, re.DOTALL)
+        if m:
+            text = m.group(0)
+        data = json.loads(text)
+    except Exception as exc:
+        last_exc = exc
+
+    if data is None:
+        return AgentReport(
+            agent_id=f"facial_topology_audit::{character_name}",
+            title=f"Facial Topology Audit — {character_name}",
+            focus=f"Geometric eye-shape integrity for {character_name}",
+            verdict="great",
+            summary=f"(agent error: {last_exc})",
+            findings=str(last_exc or "unparseable"),
+            elapsed_s=round(_time.time() - t0, 1),
+        )
+
+    verdict = str(data.get("verdict", "great")).lower().strip()
+    if verdict not in {"great", "minor_issues", "major_issues"}:
+        verdict = "great"
+
+    # Build human-readable findings from the structured output
+    lines = []
+    try:
+        ar_range = float(data.get("aspect_ratio_range", 0))
+        lines.append(f"Aspect-ratio range (open-eye panels): {ar_range:.2f}")
+    except (TypeError, ValueError):
+        pass
+    distinct = data.get("distinct_shapes", []) or []
+    if distinct:
+        lines.append(f"Distinct shape descriptors observed: {', '.join(distinct)}")
+    morphs = data.get("structural_morphs", []) or []
+    if morphs:
+        lines.append("")
+        lines.append("Structural morphs detected:")
+        for m in morphs:
+            obs = m.get("observation", "")
+            pa = m.get("panel_a", "?"); pb = m.get("panel_b", "?")
+            lines.append(f"  • Panel {pa} vs Panel {pb}: {obs}")
+    else:
+        lines.append("No structural morphs found at matching view-angles.")
+    lines.append("")
+    # Include first & last few per-panel rows as evidence
+    per_panel = data.get("per_panel", []) or []
+    if per_panel:
+        lines.append("Per-panel measurements (first 6 and last 6):")
+        for p in per_panel[:6] + per_panel[-6:]:
+            lines.append(
+                f"  Panel {p.get('panel', '?'):>3}: "
+                f"ratio={p.get('aspect_ratio', '?')} · "
+                f"shape={p.get('shape', '?')} · "
+                f"arc={p.get('eyelid_arc', '?')} · "
+                f"angle={p.get('view_angle', '?')}"
+            )
+
+    summary = str(data.get("summary", "")).strip() or f"Facial topology audit on {character_name}."
+
+    return AgentReport(
+        agent_id=f"facial_topology_audit::{character_name}",
+        title=f"Facial Topology Audit — {character_name}",
+        focus=f"Geometric eye-shape integrity for {character_name}",
+        verdict=verdict,
+        summary=summary,
+        findings="\n".join(lines),
+        elapsed_s=round(_time.time() - t0, 1),
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Agent 9 — Character Consistency Audit (judge mode, strict rubric)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def run_character_consistency_audit(video_bytes: bytes, face_grid: bytes) -> AgentReport:
+def run_character_consistency_audit(
+    video_bytes: bytes,
+    face_grid: bytes,
+    character_name: str = "the primary character",
+    *,
+    ctx: RunContext,
+) -> AgentReport:
     """
     Strict Judge-mode audit of character drift across the face-crop grid.
 
@@ -572,24 +795,18 @@ def run_character_consistency_audit(video_bytes: bytes, face_grid: bytes) -> Age
     import time
     import re as _re
 
-    judge_prompt = """
+    judge_prompt = f"""
 Role: You are an automated Visual Consistency Judge. Your sole purpose is to
-detect and quantify "Character Drift" between frames. Do not offer creative
-advice or generation tips.
+detect and quantify "Character Drift" between frames for **{character_name}**.
+Do not offer creative advice or generation tips.
 
-You are given a 4×4 FACE-CROP GRID of 16 panels. Treat Panel 1 as the
-REFERENCE character.
+You are given a 4×4 FACE-CROP GRID of 16 panels — every panel should show the
+same character, **{character_name}**, across the clip. Treat Panel 1 as the
+REFERENCE. For each other panel, compare the face against the reference on
+the four metrics below. Report the WORST drift observed across the grid.
 
-IMPORTANT — multi-character handling: the scene may contain more than one
-distinct character. A panel showing a DIFFERENT character than the one in
-Panel 1 is NOT drift — it is simply a different character. SKIP such panels
-entirely. Only compare panels where you believe the SAME character as Panel 1
-is visible. (If every panel shows a different character than Panel 1 pick the
-most commonly-appearing character as the reference instead.)
-
-For each panel where the SAME character as the reference is visible, compare
-the face against the reference on the four metrics below. Report the WORST
-drift observed across those same-character comparisons.
+If a panel clearly does NOT show {character_name} (crop failure, different
+character), skip it and note it in findings.
 
 Evaluation Metrics (the Delta):
 
@@ -609,14 +826,14 @@ For each metric, give a Drift Score 0-10 where 0 is identical and 10 is a
 complete style collapse.
 
 Your response must be a JSON object matching this shape exactly:
-{
-  "metric_rendering": { "description": "<short description>", "score": <int 0-10> },
-  "metric_geometry":  { "description": "<short description>", "score": <int 0-10> },
-  "metric_assets":    { "description": "<short description>", "score": <int 0-10> },
-  "metric_color":     { "description": "<short description>", "score": <int 0-10> },
+{{
+  "metric_rendering": {{ "description": "<short description>", "score": <int 0-10> }},
+  "metric_geometry":  {{ "description": "<short description>", "score": <int 0-10> }},
+  "metric_assets":    {{ "description": "<short description>", "score": <int 0-10> }},
+  "metric_color":     {{ "description": "<short description>", "score": <int 0-10> }},
   "pass_fail": "PASS" | "FAIL",
   "aggregate_score": <int 0-40>
-}
+}}
 
 Use PASS when aggregate_score ≤ 8, FAIL otherwise.
 Respond with JSON only, no prose.
@@ -630,38 +847,31 @@ Respond with JSON only, no prose.
     t0 = time.time()
     last_exc = None
     data = None
-    for attempt in range(3):
-        try:
-            resp = _client().models.generate_content(
-                model=MODEL_ID,
-                contents=parts,
-                config=types.GenerateContentConfig(
-                    temperature=0.0,
-                    response_mime_type="application/json",
-                    http_options=types.HttpOptions(timeout=240_000),
-                ),
-            )
-            text = (resp.text or "").strip()
-            m = _re.search(r"\{.*\}", text, _re.DOTALL)
-            if m:
-                text = m.group(0)
-            data = json.loads(text)
-            break
-        except Exception as exc:
-            last_exc = exc
-            msg = str(exc)
-            if any(code in msg for code in ("499", "503", "504", "CANCELLED", "UNAVAILABLE", "DEADLINE")):
-                if attempt < 2:
-                    time.sleep(2 ** attempt)
-                    continue
-            # Fall through with data=None
-            break
+    try:
+        resp = call_model(
+            ctx=ctx,
+            role=ModelRole.CHARACTER_AGENT,
+            agent_id=f"character_consistency_audit::{character_name}",
+            contents=parts,
+            config=types.GenerateContentConfig(
+                temperature=0.0,
+                response_mime_type="application/json",
+                http_options=types.HttpOptions(timeout=240_000),
+            ),
+        )
+        text = (resp.text or "").strip()
+        m = _re.search(r"\{.*\}", text, _re.DOTALL)
+        if m:
+            text = m.group(0)
+        data = json.loads(text)
+    except Exception as exc:
+        last_exc = exc
 
     if data is None:
         return AgentReport(
-            agent_id="character_consistency_audit",
-            title="Character Consistency Audit",
-            focus="Strict four-axis drift rubric on face grid",
+            agent_id=f"character_consistency_audit::{character_name}",
+            title=f"Character Consistency Audit — {character_name}",
+            focus=f"Strict four-axis drift rubric for {character_name}",
             verdict="great",
             summary=f"(agent error: {last_exc})",
             findings=str(last_exc or "unparseable"),
@@ -704,11 +914,11 @@ Respond with JSON only, no prose.
         f"Final Conclusion: {pass_fail} | Aggregate Drift Score: {agg}/40",
     ])
 
-    summary = f"Aggregate drift {agg}/40 — {pass_fail}"
+    summary = f"{character_name}: aggregate drift {agg}/40 — {pass_fail}"
     return AgentReport(
-        agent_id="character_consistency_audit",
-        title="Character Consistency Audit",
-        focus="Strict four-axis drift rubric on face grid",
+        agent_id=f"character_consistency_audit::{character_name}",
+        title=f"Character Consistency Audit — {character_name}",
+        focus=f"Strict four-axis drift rubric for {character_name}",
         verdict=verdict,
         summary=summary,
         findings=findings_strict,
@@ -720,7 +930,175 @@ Respond with JSON only, no prose.
 # Agent 10 — Prompt Fidelity
 # ─────────────────────────────────────────────────────────────────────────────
 
-def run_prompt_fidelity(video_bytes: bytes, transcript: str, prompt_text: str) -> AgentReport:
+# ─────────────────────────────────────────────────────────────────────────────
+# Blind Captioner — describes the video WITHOUT knowing the prompt.
+# Its output feeds the Comparator (and the Prompt Reasoner).
+# ─────────────────────────────────────────────────────────────────────────────
+
+def run_blind_captioner(video_bytes: bytes, *, ctx: RunContext) -> AgentReport:
+    """
+    Generate a purpose-blind, granular, multi-temporal description of the
+    video. The VLM does NOT see the generation prompt, so it cannot be
+    primed to describe prompt elements into existence. It describes strictly
+    what it observes.
+
+    This report is consumed by `run_prompt_vs_caption` (replacing the
+    prompt-primed Prompt Fidelity agent) and by the Prompt Reasoner.
+    """
+    prompt = """
+You are describing this video for a visually-impaired viewer. You do NOT
+know the intent behind the video. Stay strictly tethered to visual and
+audible evidence.
+
+Describe the clip in THREE temporal slices:
+
+A. START (first ~15% of the clip) — the initial static state: setting,
+   characters visible, their posture and gaze, hand/foot placement, any
+   objects they hold, the camera framing. Body proportions, colors, visible
+   accessories. Mood implied by expression and body language.
+
+B. MIDDLE (central ~50%) — what changes between start and end. Each
+   character's body motion, gaze shifts, facial expression changes, hand
+   movements, object interactions. Camera motion. Background motion.
+   Any DIALOGUE HEARD — quote it verbatim as you hear it. Note which
+   character's mouth is visibly moving.
+
+C. END (last ~15%) — the final state. Consistency with START: same
+   character design? same clothing? same accessories? same scene
+   geometry?
+
+Structure your answer in `findings` as three paragraphs labelled A, B, C.
+In `summary`, give one sentence describing what the video depicts overall.
+`verdict` should always be "great" — this agent does not judge quality,
+only describes.
+
+CRITICAL: describe what you ACTUALLY see and hear, with granularity. Do
+not editorialise. Do not reference anything labelled "the prompt" —
+you have not been given a prompt. If something is ambiguous, say so
+("the character appears to be holding something, possibly a toy").
+""".strip()
+    return _run(
+        "blind_captioner", "Blind Captioner", prompt, video_bytes,
+        ctx=ctx, role=ModelRole.SCENE_AGENT,
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Prompt-vs-Caption Comparator — deduces discrepancies between the intended
+# prompt and the blind caption. Receives NO video — pure text reasoning.
+# This replaces the old (prompt-primed) Prompt Fidelity agent.
+# ─────────────────────────────────────────────────────────────────────────────
+
+def run_prompt_vs_caption(
+    blind_caption: str,
+    transcript: str,
+    prompt_text: str,
+    *,
+    ctx: RunContext,
+) -> AgentReport:
+    system = f"""
+You are a deduction engine comparing intent vs observation. You are given:
+
+  (1) the ORIGINAL GENERATION PROMPT (intended output),
+  (2) a BLIND VIDEO DESCRIPTION written by an observer who had never seen
+      the prompt (objective observation of the video),
+  (3) the WHISPER TRANSCRIPT of the audio.
+
+You have NO access to the video itself. Your job is PURE TEXT REASONING:
+find logical contradictions or unfulfilled promises between (1) and (2)/(3).
+
+Method:
+
+1. List every concrete, named ACTION, OBJECT, ATTRIBUTE, or EVENT in the
+   prompt. (e.g. "the pups turn their heads left, then right"; "the pink
+   pup is doing a backflip"; "a tall tower on a green hill"; "dialogue
+   assigned to the blue pup".)
+
+2. For each one, find it (or its absence) in the blind description.
+   Classify as:
+      FULFILLED   — the description confirms it happened / is present
+      MISSING     — the description does not mention it (defect)
+      CONTRADICTED — the description positively describes something
+                     different (defect)
+      PARTIAL     — partially present
+      UNKNOWN     — insufficient evidence in the description
+
+3. Also flag any ADDED elements — things in the blind description that the
+   prompt did not ask for and that might indicate unintended model bias.
+
+In `findings`, produce a bullet list: `[STATUS] <prompt element> — <quote
+from blind description or "not mentioned">`. Prioritise MISSING and
+CONTRADICTED items. In `summary`, give a one-sentence judgment.
+
+Verdict:
+  great         — every substantive prompt element is FULFILLED
+  minor_issues  — 1–2 MISSING or PARTIAL elements, none central
+  major_issues  — any CONTRADICTED element OR a MISSING central action OR
+                  wrong speaker assignment
+
+BIAS WARNING: the blind description is tethered to visual reality; the
+prompt is intent. Trust the description. Do NOT assume the prompt
+happened unless the description supports it.
+
+DO NOT do pedantic string-matching. Tiny wording differences are fine.
+Meaning and observed reality are what matter.
+
+=== ORIGINAL GENERATION PROMPT ===
+{prompt_text}
+
+=== BLIND VIDEO DESCRIPTION ===
+{blind_caption}
+
+=== WHISPER TRANSCRIPT ===
+{transcript}
+""".strip()
+
+    # Pure text reasoning — routed through TEXT_REASONING role.
+    import time as _time
+    t0 = _time.time()
+    last_exc = None
+    data = None
+    try:
+        resp = call_model(
+            ctx=ctx,
+            role=ModelRole.TEXT_REASONING,
+            agent_id="prompt_vs_caption",
+            contents=[system + "\n\n" + _OUTPUT_CONTRACT],
+            config=types.GenerateContentConfig(
+                temperature=0.1,
+                response_mime_type="application/json",
+                http_options=types.HttpOptions(timeout=120_000),
+            ),
+        )
+        data = _parse_json((resp.text or "").strip())
+    except Exception as exc:
+        last_exc = exc
+
+    if data is None:
+        return AgentReport(
+            agent_id="prompt_vs_caption",
+            title="Prompt vs Blind Caption",
+            focus="Deduction-based prompt fidelity",
+            verdict="great",
+            summary=f"(agent error: {last_exc})",
+            findings=str(last_exc or "unparseable"),
+            elapsed_s=round(_time.time() - t0, 1),
+        )
+
+    return AgentReport(
+        agent_id="prompt_vs_caption",
+        title="Prompt vs Blind Caption",
+        focus="Deduction-based prompt fidelity",
+        verdict=data["verdict"],
+        summary=data["summary"],
+        findings=data["findings"],
+        elapsed_s=round(_time.time() - t0, 1),
+    )
+
+
+def run_prompt_fidelity(
+    video_bytes: bytes, transcript: str, prompt_text: str, *, ctx: RunContext,
+) -> AgentReport:
     prompt = """
 You are the script supervisor. You have the intended GENERATION PROMPT and
 the Whisper TRANSCRIPT. Scope: does the video deliver the prompt?
@@ -742,7 +1120,10 @@ Wrong speaker or promised-action missing is MAJOR.
 If everything lines up, verdict 'great'.
 """.strip()
     extra = f"WHISPER TRANSCRIPT:\n{transcript}\n\nORIGINAL GENERATION PROMPT:\n{prompt_text}"
-    return _run("prompt_fidelity", "Prompt Fidelity", prompt, video_bytes, extra)
+    return _run(
+        "prompt_fidelity", "Prompt Fidelity", prompt, video_bytes, extra,
+        ctx=ctx, role=ModelRole.SCENE_AGENT,
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -754,6 +1135,8 @@ def run_prompt_reasoner(
     reports: list[AgentReport],
     aggregator: dict,
     prompt_text: str,
+    *,
+    ctx: RunContext,
 ) -> dict:
     """
     The "Visual Detective" / Deduction Engine.
@@ -973,31 +1356,25 @@ Respond with JSON only. No prose before or after.
     t0 = time.time()
     last_exc = None
     data = None
-    for attempt in range(3):
-        try:
-            resp = _client().models.generate_content(
-                model=MODEL_ID,
-                contents=parts,
-                config=types.GenerateContentConfig(
-                    temperature=0.2,
-                    response_mime_type="application/json",
-                    http_options=types.HttpOptions(timeout=240_000),
-                ),
-            )
-            text = (resp.text or "").strip()
-            m = re.search(r"\{.*\}", text, re.DOTALL)
-            if m:
-                text = m.group(0)
-            data = json.loads(text)
-            break
-        except Exception as exc:
-            last_exc = exc
-            msg = str(exc)
-            if any(code in msg for code in ("499", "503", "504", "CANCELLED", "UNAVAILABLE", "DEADLINE")):
-                if attempt < 2:
-                    time.sleep(2 ** attempt)
-                    continue
-            break
+    try:
+        resp = call_model(
+            ctx=ctx,
+            role=ModelRole.PROMPT_REASONER,
+            agent_id="prompt_reasoner",
+            contents=parts,
+            config=types.GenerateContentConfig(
+                temperature=0.2,
+                response_mime_type="application/json",
+                http_options=types.HttpOptions(timeout=240_000),
+            ),
+        )
+        text = (resp.text or "").strip()
+        m = re.search(r"\{.*\}", text, re.DOTALL)
+        if m:
+            text = m.group(0)
+        data = json.loads(text)
+    except Exception as exc:
+        last_exc = exc
 
     elapsed = round(time.time() - t0, 1)
 
@@ -1077,7 +1454,9 @@ Respond with JSON only. No prose before or after.
 # Aggregator
 # ─────────────────────────────────────────────────────────────────────────────
 
-def run_aggregator(reports: list[AgentReport], prompt_text: str) -> dict:
+def run_aggregator(
+    reports: list[AgentReport], prompt_text: str, *, ctx: RunContext,
+) -> dict:
     agent_blocks = "\n\n".join(
         f"### {r.title} — [{r.verdict}]\n{r.summary}\n\nDetails: {r.findings}"
         for r in reports
@@ -1122,8 +1501,10 @@ Do NOT introduce claims not present in the reports. Trust the specialists.
 Respond with JSON only.
 """.strip()
 
-    resp = _client().models.generate_content(
-        model=MODEL_ID,
+    resp = call_model(
+        ctx=ctx,
+        role=ModelRole.AGGREGATOR,
+        agent_id="aggregator",
         contents=system,
         config=types.GenerateContentConfig(
             temperature=0.1,
@@ -1159,18 +1540,202 @@ Respond with JSON only.
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Agent registry — each entry: (agent_id, runner_fn, tuple-of-extra-kwargs)
+# Comparator — takes two completed report.json blobs and returns a verdict
+# of which video is better. Pure text reasoning (no video, no images): the
+# specialist work has already been done; we are reading the reports.
 # ─────────────────────────────────────────────────────────────────────────────
 
-AGENTS = [
-    ("body_consistency",            run_body_consistency,            ("body_grid",)),
-    ("face_uncanny",                run_face_uncanny,                ("face_grid",)),
-    ("character_consistency_audit", run_character_consistency_audit, ("face_grid",)),
-    ("motion_weight",               run_motion_weight,               ()),
-    ("environment_stability",       run_environment_stability,       ("keyframe_grid",)),
-    ("rendering_defects",           run_rendering_defects,           ("keyframe_grid",)),
-    ("audio_quality",               run_audio_quality,               ()),
-    ("lipsync_correspondence",      run_lipsync_correspondence,      ("speech_grid", "speech_captions")),
-    ("speech_coherence",            run_speech_coherence,            ("transcript", "segments_block")),
-    ("prompt_fidelity",             run_prompt_fidelity,             ("transcript", "prompt_text")),
+def _summarise_report_for_comparator(report: dict, label: str) -> str:
+    """Render a report.json into a compact text block suitable for the model."""
+    agg = report.get("aggregator", {}) or {}
+    parts = [
+        f"=== VIDEO {label} ===",
+        f"File: {report.get('video_file', '?')}",
+        f"Aggregator verdict: {agg.get('overall_verdict', '?')}  "
+        f"score={agg.get('score', '?')}/100",
+        f"Headline: {agg.get('headline', '')}",
+        f"What works: {agg.get('what_works', '')}",
+        f"What breaks: {agg.get('what_breaks', '')}",
+        f"Top issue: {agg.get('top_issue', '')}",
+        "",
+        "Per-agent reports:",
+    ]
+    for r in report.get("agents", []) or []:
+        parts.append(
+            f"  • [{r.get('verdict', '?')}] {r.get('title', '?')} — "
+            f"{r.get('summary', '')}"
+        )
+    transcript = (report.get("transcript") or "").strip()
+    if transcript:
+        parts.append("")
+        parts.append(f"Transcript: {transcript[:600]}")
+    return "\n".join(parts)
+
+
+def run_comparator(
+    report_a: dict,
+    report_b: dict,
+    *,
+    ctx: RunContext,
+    label_a: str = "A",
+    label_b: str = "B",
+) -> dict:
+    """Compare two completed reports and return a structured verdict.
+
+    Returns a dict:
+      {
+        "winner": "A" | "B" | "tie",
+        "confidence": "high" | "medium" | "low",
+        "headline": "<one sentence>",
+        "reasoning": "<one paragraph>",
+        "per_axis": {
+          "prompt_fidelity": "A" | "B" | "tie",
+          "rendering": "A" | "B" | "tie",
+          ...
+        }
+      }
+    """
+    block_a = _summarise_report_for_comparator(report_a, label_a)
+    block_b = _summarise_report_for_comparator(report_b, label_b)
+
+    system = f"""
+You are an automated comparator. Two AI-generated videos have already been
+analysed by a battery of specialist agents. Your job is to read the two
+specialist reports below and decide which video is better OVERALL, and which
+is better on each evaluation axis.
+
+You do NOT have access to the videos themselves. Trust the specialists.
+
+Comparison axes (be specific where the reports give signal):
+  - prompt_fidelity   (does the video deliver what the prompt asked for?)
+  - rendering         (limb / texture / hand artefacts)
+  - face_uncanny      (face quality, expressions, uncanny smell)
+  - character_consistency  (drift across the clip)
+  - motion            (motion naturalness, foot-sliding, etc.)
+  - environment       (background stability)
+  - audio             (audio quality, voice clarity)
+  - lipsync           (mouth-to-speech alignment)
+
+Rules:
+  - For each axis, choose the BETTER video, or "tie" only when reports are
+    genuinely indistinguishable on that axis.
+  - The OVERALL winner should reflect axis-weighting: prompt fidelity,
+    lipsync, and rendering matter more than environment or motion when
+    everything else is equal.
+  - "confidence" reflects how clearly the reports separate the two videos.
+    Use "high" only when one report has a clearly better verdict on
+    multiple high-weight axes.
+
+{block_a}
+
+{block_b}
+
+Respond with JSON only, matching this schema exactly:
+{{
+  "winner": "{label_a}" | "{label_b}" | "tie",
+  "confidence": "high" | "medium" | "low",
+  "headline": "<one sentence>",
+  "reasoning": "<one paragraph grounded in the specialists' findings>",
+  "per_axis": {{
+    "prompt_fidelity": "{label_a}" | "{label_b}" | "tie",
+    "rendering": "{label_a}" | "{label_b}" | "tie",
+    "face_uncanny": "{label_a}" | "{label_b}" | "tie",
+    "character_consistency": "{label_a}" | "{label_b}" | "tie",
+    "motion": "{label_a}" | "{label_b}" | "tie",
+    "environment": "{label_a}" | "{label_b}" | "tie",
+    "audio": "{label_a}" | "{label_b}" | "tie",
+    "lipsync": "{label_a}" | "{label_b}" | "tie"
+  }}
+}}
+""".strip()
+
+    resp = call_model(
+        ctx=ctx,
+        role=ModelRole.COMPARATOR,
+        agent_id="comparator",
+        contents=system,
+        config=types.GenerateContentConfig(
+            temperature=0.1,
+            response_mime_type="application/json",
+            http_options=types.HttpOptions(timeout=180_000),
+        ),
+    )
+    text = (resp.text or "").strip()
+    m = re.search(r"\{.*\}", text, re.DOTALL)
+    if m:
+        text = m.group(0)
+    try:
+        obj = json.loads(text)
+    except json.JSONDecodeError:
+        obj = {}
+
+    valid_winners = {label_a, label_b, "tie"}
+
+    def _coerce_winner(v) -> str:
+        s = str(v or "").strip()
+        return s if s in valid_winners else "tie"
+
+    confidence = str(obj.get("confidence", "low")).lower().strip()
+    if confidence not in {"high", "medium", "low"}:
+        confidence = "low"
+
+    per_axis_in = obj.get("per_axis", {}) or {}
+    per_axis: dict = {}
+    for axis in (
+        "prompt_fidelity", "rendering", "face_uncanny",
+        "character_consistency", "motion", "environment",
+        "audio", "lipsync",
+    ):
+        per_axis[axis] = _coerce_winner(per_axis_in.get(axis))
+
+    return {
+        "winner": _coerce_winner(obj.get("winner")),
+        "confidence": confidence,
+        "headline": str(obj.get("headline", "")).strip(),
+        "reasoning": str(obj.get("reasoning", "")).strip(),
+        "per_axis": per_axis,
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Agent registry — split into scene-level (one-shot per video) and
+# per-character (one-shot per detected character).
+# Each entry: (agent_id, runner_fn, tuple-of-extra-kwargs)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Per-character agents — orchestrator calls these once per unique character
+# detected in the clip. kwargs come from per-character grid builders.
+PER_CHARACTER_AGENTS = [
+    ("body_consistency",            run_body_consistency,            ("body_grid", "character_name")),
+    ("face_uncanny",                run_face_uncanny,                ("face_grid", "character_name")),
+    ("character_consistency_audit", run_character_consistency_audit, ("face_grid", "character_name")),
+    # Geometric / structural audit on the eye region. Catches morphological
+    # defects (e.g. eyes going round→almond mid-clip) that the soft
+    # "face quality" agents dismiss with "looks fine".
+    ("facial_topology_audit",       run_facial_topology_audit,       ("eye_grid",  "character_name")),
 ]
+
+# Scene-level agents — one call per video regardless of character count.
+#
+# CHANGES THIS ITERATION:
+# - VLM `lipsync_correspondence` replaced by classical optical-flow lipsync
+#   (see `lipsync_flow.py`) — it was hallucinating.
+# - `prompt_fidelity` kept as-is (primed baseline).
+# - `blind_captioner` ADDED: describes the video without seeing the prompt.
+# - `prompt_vs_caption` ADDED: deduction-only compare of prompt to blind
+#   caption, no video. Runs AFTER blind_captioner completes.
+# The two new agents sit alongside the existing prompt_fidelity so primed-vs-
+# blind methodologies can be compared head-to-head.
+SCENE_AGENTS = [
+    ("motion_weight",         run_motion_weight,         ()),
+    ("environment_stability", run_environment_stability, ("keyframe_grid",)),
+    ("rendering_defects",     run_rendering_defects,     ("keyframe_grid",)),
+    ("audio_quality",         run_audio_quality,         ()),
+    ("speech_coherence",      run_speech_coherence,      ("transcript", "segments_block")),
+    ("blind_captioner",       run_blind_captioner,       ()),
+    ("prompt_fidelity",       run_prompt_fidelity,       ("transcript", "prompt_text")),
+]
+
+# Backward compatibility: keep a flat AGENTS list pointing at scene-only agents
+# for any callers still using it. Orchestrator should use the split lists.
+AGENTS = SCENE_AGENTS

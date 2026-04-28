@@ -420,8 +420,9 @@ function renderReport(m, report) {
     <h2 class="section">Inputs fed to the VLM</h2>
     <div class="inputs-note">
       <strong>Every agent receives the full native video</strong> (the .mp4 above — ~240 frames + audio).
-      Some agents additionally receive one of these evidence images plus text context.
-      All crops use Gemini-Flash-detected bounding boxes for the character's body and face.
+      Some agents additionally receive one of the evidence images below plus text context.
+      Character grids are built per-character: each detected character gets its own body + face grid and its own Body Consistency / Face & Uncanny / Character Consistency Audit agent.
+      ${report.characters && report.characters.length ? `Detected characters: <strong>${report.characters.map(c => escapeHtml(c.name) + ` (${c.appearances} frames)`).join(', ')}</strong>.` : ''}
     </div>
     <div class="inputs-grid">
       <div class="input-card" onclick="openModal('${m.folder}/keyframe_grid.png', 'Keyframe grid — 16 full frames, 4×4')">
@@ -429,16 +430,24 @@ function renderReport(m, report) {
         <img src="${m.folder}/keyframe_grid.png" alt="keyframe grid" onerror="this.style.display='none'">
         <div class="input-consumers">→ Environment Stability, Rendering Defects</div>
       </div>
-      <div class="input-card" onclick="openModal('${m.folder}/body_grid.png', 'Body-crop grid — 16 character body crops, 4×4')">
-        <div class="input-label">Body-crop grid · 4×4 character bodies</div>
-        <img src="${m.folder}/body_grid.png" alt="body grid" onerror="this.style.display='none'">
-        <div class="input-consumers">→ Body Consistency</div>
-      </div>
-      <div class="input-card" onclick="openModal('${m.folder}/face_grid.png', 'Face-crop grid — 16 tight face crops, 4×4')">
-        <div class="input-label">Face-crop grid · 4×4 tight face crops</div>
-        <img src="${m.folder}/face_grid.png" alt="face grid" onerror="this.style.display='none'">
-        <div class="input-consumers">→ Face & Uncanny Valley</div>
-      </div>
+      ${(report.characters || []).map(c => `
+        <div class="input-card" onclick="openModal('${m.folder}/${c.body_grid}', 'Body-crop grid — ${escapeHtml(c.name)}')">
+          <div class="input-label">Body grid · ${escapeHtml(c.name)}</div>
+          <img src="${m.folder}/${c.body_grid}" alt="body grid ${escapeHtml(c.name)}" onerror="this.style.display='none'">
+          <div class="input-consumers">→ Body Consistency (${escapeHtml(c.name)})</div>
+        </div>
+        <div class="input-card" onclick="openModal('${m.folder}/${c.face_grid}', 'Face-crop grid — ${escapeHtml(c.name)}')">
+          <div class="input-label">Face grid · ${escapeHtml(c.name)}</div>
+          <img src="${m.folder}/${c.face_grid}" alt="face grid ${escapeHtml(c.name)}" onerror="this.style.display='none'">
+          <div class="input-consumers">→ Face & Uncanny + Character Consistency Audit (${escapeHtml(c.name)})</div>
+        </div>
+        ${c.eye_grid ? `
+        <div class="input-card" onclick="openModal('${m.folder}/${c.eye_grid}', 'Eye-region grid — ${escapeHtml(c.name)}')">
+          <div class="input-label">Eye-region grid · ${escapeHtml(c.name)}</div>
+          <img src="${m.folder}/${c.eye_grid}" alt="eye grid ${escapeHtml(c.name)}" onerror="this.style.display='none'">
+          <div class="input-consumers">→ Facial Topology Audit (${escapeHtml(c.name)})</div>
+        </div>` : ''}
+      `).join('')}
       <div class="input-card" onclick="openModal('${m.folder}/speech_grid.png', 'Speech-timestamp face-crop grid')">
         <div class="input-label">Speech grid · face crops at speech moments</div>
         <img src="${m.folder}/speech_grid.png" alt="speech grid" onerror="this.style.display='none'">
@@ -449,11 +458,12 @@ function renderReport(m, report) {
     <h2 class="section">Agent analyses</h2>
   `;
 
-  // Map of which inputs each agent receives — matches agents.py::AGENTS registry.
+  // Map of which inputs each agent receives — matches agents.py registries.
   const AGENT_INPUTS = {
-    body_consistency:            'full video + body-crop grid (4×4, 16 body bboxes)',
-    face_uncanny:                'full video + face-crop grid (4×4, 16 face bboxes)',
-    character_consistency_audit: 'full video + face-crop grid (strict judge rubric)',
+    body_consistency:            'full video + per-character body-crop grid (24 panels)',
+    face_uncanny:                'full video + per-character face-crop grid (24 panels)',
+    character_consistency_audit: 'full video + per-character face-crop grid (strict judge rubric)',
+    facial_topology_audit:       'full video + per-character eye-crop grid (geometric rubric)',
     motion_weight:               'full video only',
     environment_stability:       'full video + keyframe grid (4×4, 16 full frames)',
     rendering_defects:           'full video + keyframe grid (4×4, 16 full frames)',
@@ -464,7 +474,9 @@ function renderReport(m, report) {
   };
 
   (report.agents || []).forEach((r, i) => {
-    const inputs = AGENT_INPUTS[r.agent_id] || 'full video';
+    // Per-character agents have ids like "body_consistency::pink dog" — strip suffix for lookup.
+    const baseId = (r.agent_id || '').split('::')[0];
+    const inputs = AGENT_INPUTS[baseId] || AGENT_INPUTS[r.agent_id] || 'full video';
     html += `
       <div class="agent-card ${r.verdict}" id="agent-${i}">
         <div class="head">

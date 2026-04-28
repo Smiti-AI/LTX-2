@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>LoRA benchmarks — index</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 24px 32px 60px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      background: #0e0e11; color: #e6e6e6;
+    }
+    h1 { font-size: 22px; margin: 0 0 4px; }
+    .top-meta { color: #888; font-size: 13px; margin-bottom: 28px; }
+    h2 { font-size: 14px; color: #9ec; text-transform: uppercase; letter-spacing: 0.05em; margin: 32px 0 12px; }
+    .grid {
+      display: grid; gap: 12px;
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    }
+    .card {
+      display: block;
+      background: #1a1a20; border: 1px solid #2a2a32;
+      border-radius: 10px; padding: 14px 16px;
+      text-decoration: none; color: inherit;
+      transition: background 0.1s, border-color 0.1s;
+    }
+    .card:hover { background: #22222a; border-color: #3a3a48; }
+    .card-title { font-size: 14px; font-weight: 600; color: #e6e6e6; margin-bottom: 4px; }
+    .card-label { font-size: 12px; color: #cde; margin-bottom: 6px; line-height: 1.4; }
+    .card-meta { font-size: 12px; color: #aaa; }
+    .card-rel { font-size: 11px; color: #555; margin-top: 6px; font-family: ui-monospace, monospace; }
+    .badge {
+      display: inline-block; margin-left: 8px;
+      padding: 2px 6px; border-radius: 4px; font-size: 11px;
+      background: #333; color: #ddd;
+    }
+    .badge.ok      { background: #1f5c2c; color: #c8f0d2; }
+    .badge.partial { background: #5c4a1f; color: #f0e0c0; }
+    .badge.empty   { background: #5c1f1f; color: #ffc0c0; }
+  </style>
+</head>
+<body>
+  <h1>LoRA benchmark index</h1>
+  <div class="top-meta">16 benchmarks discovered &middot; click any card to open the per-scene compare viewer</div>
+  
+      <section>
+        <h2>chase_lora</h2>
+        <div class="grid">
+        <a class="card" href="chase_lora/benchmarks/chase_exp1_highcap/compare.html">
+          <div class="card-title">chase_exp1_highcap</div>
+          <div class="card-label">Chase LoRA on Chase-only prompts (rank 32 + FFN)</div>
+          <div class="card-meta">
+            Chase prompts (5 scenes) &middot; 3 checkpoint cols
+            <span class="badge ok">15/15 &middot; 100%</span>
+          </div>
+          <div class="card-rel">chase_lora/benchmarks/chase_exp1_highcap</div>
+        </a>
+        <a class="card" href="chase_lora/benchmarks_xeval/goldenPLUS150_benchmark/compare.html">
+          <div class="card-title">goldenPLUS150_benchmark</div>
+          <div class="card-label">Cross-eval: golden 150 LoRA evaluated on Chase prompts</div>
+          <div class="card-meta">
+            Chase prompts (5 scenes) &middot; 6 checkpoint cols
+            <span class="badge ok">30/30 &middot; 100%</span>
+          </div>
+          <div class="card-rel">chase_lora/benchmarks_xeval/goldenPLUS150_benchmark</div>
+        </a>
+        </div>
+      </section>
+      <section>
+        <h2>full_episods</h2>
+        <div class="grid">
+        <a class="card" href="full_episods/full_cast_exp1_benchmark/compare.html">
+          <div class="card-title">full_cast_exp1_benchmark</div>
+          <div class="card-label">Full-episode LoRA — paw_patrol s01e03a, rank 32</div>
+          <div class="card-meta">
+            BM_v1 (7 scenes) · 4s @ 832×960 &middot; 5 checkpoint cols
+            <span class="badge ok">35/35 &middot; 100%</span>
+          </div>
+          <div class="card-rel">full_episods/full_cast_exp1_benchmark</div>
+        </a>
+        <a class="card" href="full_episods/full_cast_exp1_bm_v2/compare.html">
+          <div class="card-title">full_cast_exp1_bm_v2</div>
+          <div class="card-label">Full-episode LoRA — 10s rerun of step 6k+10k</div>
+          <div class="card-meta">
+            BM_v1 (7 scenes) · 9.7s @ per-scene dims &middot; 2 checkpoint cols
+            <span class="badge partial">13/14 &middot; 93%</span>
+          </div>
+          <div class="card-rel">full_episods/full_cast_exp1_bm_v2</div>
+        </a>
+        </div>
+      </section>
+      <section>
+        <h2>goldenPlus150_version1</h2>
+        <div class="grid">
+        <a class="card" href="goldenPlus150_version1/goldenPLUS150_benchmark/compare.html">
+          <div class="card-title">goldenPLUS150_benchmark</div>
+          <div class="card-label">Phase 3 baseline — original captions, rank 32</div>
+          <div class="card-meta">
+            BM_v1 (7 scenes) · 4s @ 832×960 &middot; 6 checkpoint cols
+            <span class="badge ok">42/42 &middot; 100%</span>
+          </div>
+          <div class="card-rel">goldenPlus150_version1/goldenPLUS150_benchmark</div>
+        </a>
+        <a class="card" href="goldenPlus150_version1/goldenPLUS150_bm_v2/compare.html">
+          <div class="card-title">goldenPLUS150_bm_v2</div>
+          <div class="card-label">Phase 3 baseline — original captions, rank 32 (10s rerun of step 25k+40k)</div>
+          <div class="card-meta">
+            BM_v1 (7 scenes) · 9.7s @ per-scene dims (1280×672) &middot; 3 checkpoint cols
+            <span class="badge ok">21/21 &middot; 100%</span>
+          </div>
+          <div class="card-rel">goldenPlus150_version1/goldenPLUS150_bm_v2</div>
+        </a>
+        <a class="card" href="goldenPlus150_version1/goldenPLUS150_v2_rank128_bm/compare.html">
+          <div class="card-title">goldenPLUS150_v2_rank128_bm</div>
+          <div class="card-label">Phase 4 — rank 128, original captions, from-scratch [partial bm machine — superseded]</div>
+          <div class="card-meta">
+            BM_v1 (7 scenes) · 9.7s @ per-scene dims &middot; 2 checkpoint cols
+            <span class="badge partial">13/14 &middot; 93%</span>
+          </div>
+          <div class="card-rel">goldenPlus150_version1/goldenPLUS150_v2_rank128_bm</div>
+        </a>
+        <a class="card" href="goldenPlus150_version1/goldenPLUS150_v2_rank32_scratch/compare.html">
+          <div class="card-title">goldenPLUS150_v2_rank32_scratch</div>
+          <div class="card-label">Rank-32 from-scratch — original captions (isolates warm-start effect, step 10k FINAL)</div>
+          <div class="card-meta">
+            5 Skye scenes · 9.7s @ per-scene dims &middot; 2 checkpoint cols
+            <span class="badge ok">10/10 &middot; 100%</span>
+          </div>
+          <div class="card-rel">goldenPlus150_version1/goldenPLUS150_v2_rank32_scratch</div>
+        </a>
+        </div>
+      </section>
+      <section>
+        <h2>skye_old</h2>
+        <div class="grid">
+        <a class="card" href="skye_old/skye_exp1_baseline/compare.html">
+          <div class="card-title">skye_exp1_baseline</div>
+          
+          <div class="card-meta">
+            10 scenes &middot; 3 checkpoint cols
+            <span class="badge ok">30/30 &middot; 100%</span>
+          </div>
+          <div class="card-rel">skye_old/skye_exp1_baseline</div>
+        </a>
+        <a class="card" href="skye_old/skye_exp2_10k/compare.html">
+          <div class="card-title">skye_exp2_10k</div>
+          
+          <div class="card-meta">
+            10 scenes &middot; 11 checkpoint cols
+            <span class="badge ok">110/110 &middot; 100%</span>
+          </div>
+          <div class="card-rel">skye_old/skye_exp2_10k</div>
+        </a>
+        <a class="card" href="skye_old/skye_exp2_standard/compare.html">
+          <div class="card-title">skye_exp2_standard</div>
+          
+          <div class="card-meta">
+            10 scenes &middot; 8 checkpoint cols
+            <span class="badge ok">80/80 &middot; 100%</span>
+          </div>
+          <div class="card-rel">skye_old/skye_exp2_standard</div>
+        </a>
+        <a class="card" href="skye_old/skye_exp3_highcap/benchmarks/skye_exp3_highcap/compare.html">
+          <div class="card-title">skye_exp3_highcap</div>
+          
+          <div class="card-meta">
+            10 scenes &middot; 16 checkpoint cols
+            <span class="badge ok">160/160 &middot; 100%</span>
+          </div>
+          <div class="card-rel">skye_old/skye_exp3_highcap/benchmarks/skye_exp3_highcap</div>
+        </a>
+        <a class="card" href="skye_old/skye_exp3_highres/compare.html">
+          <div class="card-title">skye_exp3_highres</div>
+          
+          <div class="card-meta">
+            10 scenes &middot; 3 checkpoint cols
+            <span class="badge ok">30/30 &middot; 100%</span>
+          </div>
+          <div class="card-rel">skye_old/skye_exp3_highres</div>
+        </a>
+        <a class="card" href="skye_old/skye_exp4_10k/compare.html">
+          <div class="card-title">skye_exp4_10k</div>
+          
+          <div class="card-meta">
+            10 scenes &middot; 9 checkpoint cols
+            <span class="badge partial">89/90 &middot; 99%</span>
+          </div>
+          <div class="card-rel">skye_old/skye_exp4_10k</div>
+        </a>
+        <a class="card" href="skye_old/skye_exp4_i2v/compare.html">
+          <div class="card-title">skye_exp4_i2v</div>
+          
+          <div class="card-meta">
+            10 scenes &middot; 6 checkpoint cols
+            <span class="badge ok">60/60 &middot; 100%</span>
+          </div>
+          <div class="card-rel">skye_old/skye_exp4_i2v</div>
+        </a>
+        <a class="card" href="skye_old/skye_exp5_clean_highres/compare.html">
+          <div class="card-title">skye_exp5_clean_highres</div>
+          
+          <div class="card-meta">
+            10 scenes &middot; 4 checkpoint cols
+            <span class="badge partial">39/40 &middot; 98%</span>
+          </div>
+          <div class="card-rel">skye_old/skye_exp5_clean_highres</div>
+        </a>
+        </div>
+      </section>
+</body>
+</html>

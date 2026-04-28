@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>LoRA checkpoint sweep — compare</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      background: #0e0e11; color: #e6e6e6;
+      display: flex; flex-direction: column;
+      overflow: hidden;
+    }
+    header {
+      padding: 12px 22px;
+      background: #191920;
+      border-bottom: 1px solid #28282e;
+      flex-shrink: 0;
+    }
+    h1 { font-size: 18px; margin: 0 0 2px; font-weight: 600; }
+    .subtitle { color: #888; font-size: 13px; }
+
+    .scene-tabs {
+      display: flex; gap: 6px; padding: 10px 22px;
+      background: #131318;
+      border-bottom: 1px solid #28282e;
+      overflow-x: auto; flex-shrink: 0;
+    }
+    .scene-tab {
+      padding: 8px 14px;
+      background: #222229;
+      border: 1px solid #32323a;
+      border-radius: 8px;
+      cursor: pointer; font-size: 13px;
+      white-space: nowrap;
+    }
+    .scene-tab:hover { background: #2a2a33; }
+    .scene-tab.active { background: #2a5a8a; border-color: #4a80c0; color: #fff; }
+
+    .controls {
+      display: flex; align-items: center; gap: 14px;
+      padding: 10px 22px;
+      background: #15151b;
+      border-bottom: 1px solid #28282e;
+      flex-shrink: 0;
+      font-size: 13px;
+    }
+    .controls label { color: #aaa; cursor: pointer; user-select: none; }
+    .controls input[type=checkbox] { vertical-align: middle; margin-right: 6px; }
+    .controls .sep { color: #444; }
+    .controls button {
+      background: #222229; color: #ddd; border: 1px solid #32323a;
+      border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer;
+    }
+    .controls button:hover { background: #2a2a33; }
+
+    main {
+      flex: 1; overflow: auto;
+      padding: 16px 22px 30px;
+      background: #0e0e11;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 14px;
+    }
+    .card {
+      background: #1a1a20;
+      border: 1px solid #2a2a32;
+      border-radius: 10px;
+      padding: 10px 10px 8px;
+      display: flex; flex-direction: column;
+    }
+    .card.missing { opacity: 0.45; border-style: dashed; }
+    .card-head {
+      display: flex; justify-content: space-between; align-items: baseline;
+      margin: 0 4px 8px;
+    }
+    .card-title { font-size: 13px; font-weight: 600; color: #e6e6e6; }
+    .card-meta { font-size: 11px; color: #888; }
+    video {
+      width: 100%; height: auto;
+      background: #000; border-radius: 6px; display: block;
+    }
+    .placeholder {
+      width: 100%; aspect-ratio: 16/9;
+      background: #15151b; border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      color: #666; font-size: 12px;
+    }
+    .error-banner {
+      padding: 14px 22px; background: #5c1f1f; color: #ffcdd2;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1 id="title">LoRA checkpoint sweep — compare</h1>
+    <div class="subtitle" id="subtitle">loading config…</div>
+  </header>
+
+  <div class="scene-tabs" id="scene-tabs"></div>
+
+  <div class="controls">
+    <label><input type="checkbox" id="muted" checked> muted</label>
+    <label><input type="checkbox" id="loop" checked> loop</label>
+    <label><input type="checkbox" id="autoplay" checked> autoplay</label>
+    <span class="sep">|</span>
+    <button id="play-all">▶ play all</button>
+    <button id="pause-all">⏸ pause all</button>
+    <button id="restart-all">⟲ restart</button>
+    <button id="sync">🔗 sync to first</button>
+  </div>
+
+  <main>
+    <div class="grid" id="grid"></div>
+  </main>
+
+<script>
+let CONFIG = null;
+let currentScene = null;
+
+async function loadConfig() {
+  const r = await fetch('compare_config.json');
+  if (!r.ok) throw new Error(`compare_config.json: ${r.status}`);
+  CONFIG = await r.json();
+  if (CONFIG.title) document.getElementById('title').textContent = CONFIG.title;
+  document.getElementById('subtitle').textContent =
+    `${CONFIG.scenes.length} scenes × ${CONFIG.checkpoints.length} checkpoints`
+    + (CONFIG.subtitle ? ` — ${CONFIG.subtitle}` : '');
+  currentScene = CONFIG.scenes[0];
+}
+
+function renderTabs() {
+  const el = document.getElementById('scene-tabs');
+  el.innerHTML = '';
+  CONFIG.scenes.forEach(s => {
+    const t = document.createElement('div');
+    t.className = 'scene-tab' + (s === currentScene ? ' active' : '');
+    t.textContent = s;
+    t.onclick = () => { currentScene = s; renderTabs(); renderGrid(); };
+    el.appendChild(t);
+  });
+}
+
+function renderGrid() {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  const muted    = document.getElementById('muted').checked;
+  const loop     = document.getElementById('loop').checked;
+  const autoplay = document.getElementById('autoplay').checked;
+
+  CONFIG.checkpoints.forEach(({ label, folder, filename }) => {
+    const fname = filename.replace('{scene}', currentScene);
+    const path  = `${folder}/${fname}`;
+    const card  = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="card-head">
+        <span class="card-title">${label}</span>
+        <span class="card-meta">${path}</span>
+      </div>
+      <video data-label="${label}" controls playsinline preload="metadata"
+             ${muted ? 'muted' : ''} ${loop ? 'loop' : ''} ${autoplay ? 'autoplay' : ''}>
+        <source src="${path}" type="video/mp4">
+      </video>
+    `;
+    const v = card.querySelector('video');
+    v.addEventListener('error', () => {
+      card.classList.add('missing');
+      v.replaceWith(Object.assign(document.createElement('div'),
+        { className: 'placeholder', textContent: '⚠ video not found' }));
+    });
+    grid.appendChild(card);
+  });
+}
+
+function applyControls(v) {
+  v.muted    = document.getElementById('muted').checked;
+  v.loop     = document.getElementById('loop').checked;
+  v.autoplay = document.getElementById('autoplay').checked;
+}
+
+function bindControls() {
+  ['muted', 'loop', 'autoplay'].forEach(id => {
+    document.getElementById(id).addEventListener('change', () =>
+      document.querySelectorAll('video').forEach(applyControls));
+  });
+  document.getElementById('play-all').onclick    = () =>
+    document.querySelectorAll('video').forEach(v => v.play().catch(()=>{}));
+  document.getElementById('pause-all').onclick   = () =>
+    document.querySelectorAll('video').forEach(v => v.pause());
+  document.getElementById('restart-all').onclick = () =>
+    document.querySelectorAll('video').forEach(v => { v.currentTime = 0; v.play().catch(()=>{}); });
+  document.getElementById('sync').onclick = () => {
+    const first = document.querySelector('video');
+    if (!first) return;
+    const t = first.currentTime;
+    document.querySelectorAll('video').forEach(v => { v.currentTime = t; });
+  };
+}
+
+(async () => {
+  try {
+    await loadConfig();
+    renderTabs();
+    renderGrid();
+    bindControls();
+  } catch (e) {
+    document.body.insertAdjacentHTML('afterbegin',
+      `<div class="error-banner">Failed to load compare_config.json — ${e.message}</div>`);
+  }
+})();
+</script>
+</body>
+</html>

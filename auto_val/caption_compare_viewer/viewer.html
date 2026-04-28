@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Caption A/B/C — old vs v1 (no dialogue) vs v2 (with dialogue)</title>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; background:#111; color:#eee; margin:0; padding:24px; }
+  h1 { font-weight:500; font-size:20px; margin:0 0 8px 0; }
+  .sub { color:#888; font-size:13px; margin-bottom:24px; line-height:1.5; }
+  .row { display:grid; grid-template-columns: 360px 1fr 1fr 1fr; gap:14px; padding:18px 0; border-top:1px solid #2a2a2a; align-items:start; }
+  .row:first-of-type { border-top:none; }
+  .clipname { font-family: ui-monospace, Menlo, monospace; font-size:11px; color:#777; margin-bottom:6px; }
+  video { width:100%; border-radius:6px; background:#000; }
+  .cap { font-size:13px; line-height:1.5; padding:10px 12px; border-radius:6px; }
+  .old { background:#3a1f1f; border:1px solid #5a2a2a; color:#f0c8c8; }
+  .v1  { background:#2a2a3a; border:1px solid #3d3d55; color:#cdcde8; }
+  .v2  { background:#1f3a2a; border:1px solid #2a5a3a; color:#c8f0d4; }
+  .label { font-size:10px; text-transform:uppercase; letter-spacing:0.6px; margin-bottom:6px; font-weight:600; }
+  .old .label { color:#e0857d; }
+  .v1  .label { color:#9595c5; }
+  .v2  .label { color:#7dd29a; }
+  .v2 q { font-style: italic; color:#ffe8a3; }
+</style>
+</head>
+<body>
+<h1>Caption A/B/C — 10 random PAW Patrol clips</h1>
+<div class="sub">
+  <b>Old</b>: identical generic caption shared by all 136 clips. &nbsp;|&nbsp;
+  <b>v1</b>: Gemini 2.5 Pro structured (no dialogue transcribed). &nbsp;|&nbsp;
+  <b>v2</b>: Gemini 2.5 Pro with verbatim dialogue from audio.<br>
+  v2 was generated 2026-04-26 with the rule flipped to "INCLUDE the dialogue verbatim in double quotes, attributed by name."
+</div>
+<div id="rows"></div>
+
+<script>
+function highlightDialogue(text) {
+  // Wrap "...quoted dialogue..." in <q> for italic highlight
+  return text.replace(/"([^"]+)"/g, '<q>"$1"</q>');
+}
+fetch('samples.json').then(r => r.json()).then(samples => {
+  const root = document.getElementById('rows');
+  for (const s of samples) {
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.innerHTML = `
+      <div>
+        <div class="clipname">${s.clip}</div>
+        <video src="clips/${s.clip}" controls loop playsinline></video>
+      </div>
+      <div class="cap old"><div class="label">Old (generic, all 136 share this)</div>${s.old}</div>
+      <div class="cap v1"><div class="label">v1 — no dialogue</div>${s.v1}</div>
+      <div class="cap v2"><div class="label">v2 — with dialogue</div>${highlightDialogue(s.v2)}</div>
+    `;
+    root.appendChild(row);
+  }
+});
+</script>
+</body>
+</html>
