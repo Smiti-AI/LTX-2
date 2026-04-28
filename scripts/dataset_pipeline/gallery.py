@@ -87,17 +87,56 @@ def _ensure_black_filler(work_dir: Path) -> Path:
     return p
 
 
-def render_per_clip(src_mp4: Path, prompt_text: str, idx: int, out_mp4: Path) -> None:
-    """Render one gallery clip showing what the trainer sees:
-      - Video region 960×544: BICUBIC scale-to-fill + center-crop, then trimmed
-        to GALLERY_FRAMES_PER_CLIP frames at GALLERY_FPS. This mirrors
-        process_videos.py:_resize_and_crop (reshape_mode='center') + the
-        49-frame slice in compute_latents (`frames_resized[:N]`).
-      - Bottom 240px: solid black band carrying the wrapped caption.
-      - Index '#NNNN' burned top-left of the video region.
-      - Source audio preserved (also trimmed to clip duration).
-    Final canvas = 960×784. Clip plays for ~2.04s (49/24 fps).
+def _letterbox_chain() -> str:
+    """ffmpeg vf chain that scales the video to fit 960×544 with aspect
+    preserved and pads with black bars (no cropping). This is what the
+    trainer effectively sees once we pre-process source clips, and the
+    transform we apply for both galleries' video region."""
+    return (
+        f"scale={GALLERY_W}:{GALLERY_VIDEO_H}:force_original_aspect_ratio=decrease:flags=bicubic,"
+        f"pad={GALLERY_W}:{GALLERY_VIDEO_H}:(ow-iw)/2:(oh-ih)/2:black,"
+        f"setsar=1"
+    )
+
+
+def transform_to_training_format(src_mp4: Path, out_mp4: Path) -> None:
+    """Pre-process a raw clip into the trainer's exact view:
+      - Letterbox-scale to 960×544 (no cropping, ears/tails preserved).
+      - Trim to GALLERY_FRAMES_PER_CLIP frames at GALLERY_FPS.
+      - Audio re-encoded to the gallery's uniform AAC params.
+    This produces what `processed_videos/0NNN.mp4` should be — the file
+    the trainer's process_dataset.py consumes."""
+    out_mp4.parent.mkdir(parents=True, exist_ok=True)
+    duration = f"{GALLERY_CLIP_DURATION_S:.4f}"
+    cmd = [
+        "ffmpeg", "-y", "-loglevel", "error",
+        "-i", str(src_mp4),
+        "-vf", _letterbox_chain(),
+        "-r", str(GALLERY_FPS),
+        "-frames:v", str(GALLERY_FRAMES_PER_CLIP),
+        "-t", duration,
+        "-c:v", "libx264", "-preset", "fast", "-crf", "20", "-pix_fmt", "yuv420p",
+        "-c:a", AUDIO_CODEC, "-ar", str(AUDIO_RATE), "-ac", str(AUDIO_CH), "-b:a", AUDIO_BR,
+        str(out_mp4),
+    ]
+    subprocess.run(cmd, check=True)
+
+
+def render_per_clip(src_mp4: Path, prompt_text: str, idx: int, out_mp4: Path,
+                    *, mode: str = "training") -> None:
+    """Render one gallery clip with index + caption overlay.
+
+    mode='training': source must already be 960×544 letterboxed (the output
+        of transform_to_training_format). Trim to GALLERY_FRAMES_PER_CLIP
+        frames so the clip plays exactly what the model trains on.
+    mode='source': source is the RAW download; apply only the letterbox
+        scale-to-fit so it sits cleanly in the 960×544 canvas. NO frame trim
+        — show the full original duration so missing context is visible.
+
+    Final canvas in both modes: 960×784 (544 video + 240 caption band).
     """
+    if mode not in ("training", "source"):
+        raise ValueError(f"unknown mode={mode!r}")
     out_mp4.parent.mkdir(parents=True, exist_ok=True)
     wrapped = _wrap_caption(prompt_text)
     prompt_tmp = out_mp4.with_suffix(".prompt.txt")
@@ -108,15 +147,10 @@ def render_per_clip(src_mp4: Path, prompt_text: str, idx: int, out_mp4: Path) ->
 
     label_esc = _drawtext_escape(f"#{idx:04d}")
     caption_y = GALLERY_VIDEO_H + 16
-    duration = f"{GALLERY_CLIP_DURATION_S:.4f}"
 
     vf = (
-        # 1. trainer-equivalent: scale-to-fill (preserve aspect), then center-crop.
-        #    `force_original_aspect_ratio=increase` matches the trainer's
-        #    "scale so the smaller dim fits, then crop the excess".
-        f"scale={GALLERY_W}:{GALLERY_VIDEO_H}:force_original_aspect_ratio=increase:flags=bicubic,"
-        f"crop={GALLERY_W}:{GALLERY_VIDEO_H},"
-        f"setsar=1,"
+        # 1. letterbox into the 960×544 video region (preserves all content)
+        f"{_letterbox_chain()},"
         # 2. extend canvas downward — bottom 240px is the caption band
         f"pad={GALLERY_W}:{GALLERY_H}:0:0:black,"
         # 3. index label inside the video region
@@ -131,15 +165,16 @@ def render_per_clip(src_mp4: Path, prompt_text: str, idx: int, out_mp4: Path) ->
     cmd = [
         "ffmpeg", "-y", "-loglevel", "error",
         "-i", str(src_mp4),
-        # Match trainer: take exactly GALLERY_FRAMES_PER_CLIP frames at target fps.
         "-vf", vf,
         "-r", str(GALLERY_FPS),
-        "-frames:v", str(GALLERY_FRAMES_PER_CLIP),
-        "-t", duration,
         "-c:v", "libx264", "-preset", "fast", "-crf", "20", "-pix_fmt", "yuv420p",
         "-c:a", AUDIO_CODEC, "-ar", str(AUDIO_RATE), "-ac", str(AUDIO_CH), "-b:a", AUDIO_BR,
-        str(out_mp4),
     ]
+    if mode == "training":
+        # exactly 49 frames @ 24fps
+        cmd += ["-frames:v", str(GALLERY_FRAMES_PER_CLIP),
+                "-t", f"{GALLERY_CLIP_DURATION_S:.4f}"]
+    cmd.append(str(out_mp4))
     subprocess.run(cmd, check=True)
     prompt_tmp.unlink(missing_ok=True)
 

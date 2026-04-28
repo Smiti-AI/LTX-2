@@ -24,6 +24,13 @@ from captions import apply_brand_tokens, load_brand_tokens  # noqa: E402
 
 
 def emit(dataset_root: Path, out_path: Path) -> int:
+    """Emit trainer-input CSV pointing at the LETTERBOXED processed clips
+    (processed_videos/), with brand-token substitution applied to captions.
+
+    The trainer's process_dataset.py runs its own scale+crop on whatever
+    we hand it; by pre-letterboxing to exact target dimensions, that
+    internal step becomes a no-op and the latents reflect the same
+    letterboxed pixels you see in training_gallery.mp4."""
     md = json.loads((dataset_root / "metadata.json").read_text())
     token_map = load_brand_tokens()
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -36,8 +43,14 @@ def emit(dataset_root: Path, out_path: Path) -> int:
                 continue
             if not (c.get("download_ok", True) and c.get("prompt")):
                 continue
+            # Verify the processed clip actually exists; skip with warn if not.
+            processed = dataset_root / "processed_videos" / f"{c['index']:04d}.mp4"
+            if not processed.exists():
+                print(f"WARN: skipping clip {c['index']} — {processed} not found "
+                      f"(run render_gallery_for_dataset.py first)")
+                continue
             caption = apply_brand_tokens(c["prompt"], token_map)
-            w.writerow([c["index"], caption, c["video"]])
+            w.writerow([c["index"], caption, f"processed_videos/{c['index']:04d}.mp4"])
             n += 1
     return n
 
