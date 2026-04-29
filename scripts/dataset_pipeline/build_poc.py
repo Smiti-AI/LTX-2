@@ -151,7 +151,7 @@ def build_skye(out_root: Path, limit: int) -> list[POCClip]:
             source_season=int(row.get("season_number") or 0),
             source_scene_number=float(row.get("scene_number") or 0),
             speaker="SKYE",
-            video=f"videos/{i:04d}.mp4",
+            video=f"raw_videos/{i:04d}.mp4",
             prompt=caption,
             prompt_path=f"prompts/{i:04d}.txt",
         )
@@ -202,7 +202,7 @@ def build_chase(out_root: Path, limit: int) -> list[POCClip]:
             source_season=int(meta.get("season_number") or 0),
             source_scene_number=float(meta.get("scene_number") or 0),
             speaker="CHASE",
-            video=f"videos/{i:04d}.mp4",
+            video=f"raw_videos/{i:04d}.mp4",
             prompt=caption,
             prompt_path=f"prompts/{i:04d}.txt",
         )
@@ -289,7 +289,7 @@ def main() -> int:
 
     for character, version, dataset_dir, source_label in targets:
         out_root = Path(args.local_out) / dataset_dir
-        (out_root / "videos").mkdir(parents=True, exist_ok=True)
+        (out_root / "raw_videos").mkdir(parents=True, exist_ok=True)
         print(f"\n=== POC build: {dataset_dir} (limit={args.limit}) ===", flush=True)
         if character == "skye":
             clips = build_skye(out_root, args.limit)

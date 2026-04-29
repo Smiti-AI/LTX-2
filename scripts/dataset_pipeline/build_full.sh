@@ -46,7 +46,10 @@ echo "[3/4] emit_trainer_csv" | tee -a "$LOG"
 python3 ~/LTX-2/scripts/dataset_pipeline/emit_trainer_csv.py \
   --dataset "$DS" 2>&1 | tee -a "$LOG"
 
-# Stage 4: latent + condition encoding (GPU)
+# Stage 4: latent + condition encoding (GPU). The trainer hardcodes
+# `latents/` and `conditions/` as output subdir names; we rename them
+# afterwards to the human-readable names that live in GCS. A symlink
+# is recreated by `stage_for_training.sh` before any training run.
 echo "[4/4] process_dataset (latents + conditions)" | tee -a "$LOG"
 cd ~/LTX-2/packages/ltx-trainer
 /home/efrattaig/.local/bin/uv run python scripts/process_dataset.py \
@@ -58,6 +61,16 @@ cd ~/LTX-2/packages/ltx-trainer
   --video-column video_path \
   --output-dir "$DS/precomputed" \
   --batch-size 1 2>&1 | tee -a "$LOG"
+
+# Rename trainer outputs to the canonical human-readable names.
+echo "[4b/4] rename precomputed/{latents,conditions} → vae_latents_video, text_prompt_conditions" | tee -a "$LOG"
+[ -d "$DS/precomputed/latents" ]    && mv "$DS/precomputed/latents"    "$DS/precomputed/vae_latents_video"
+[ -d "$DS/precomputed/conditions" ] && mv "$DS/precomputed/conditions" "$DS/precomputed/text_prompt_conditions"
+
+# Drop a static processing_summary.txt next to the processed clips so
+# anyone inspecting the bucket later understands the transform.
+cp ~/LTX-2/scripts/dataset_pipeline/processing_summary.txt \
+   "$DS/processed_videos/processing_summary.txt"
 
 echo "=== build_full $CHAR DONE ===" | tee -a "$LOG"
 date | tee -a "$LOG"

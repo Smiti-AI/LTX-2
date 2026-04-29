@@ -1,0 +1,47 @@
+# processed_videos/ — what's in here and how it got here
+
+Source        :  ../raw_videos/0NNN.mp4
+Producer      :  scripts/dataset_pipeline/gallery.py:transform_to_training_format
+                 (called by render_gallery_for_dataset.py during build)
+
+Transformations applied (in order, all via ffmpeg):
+
+  1. Letterbox to 960×544
+       scale=960:544:force_original_aspect_ratio=decrease:flags=bicubic,
+       pad=960:544:(ow-iw)/2:(oh-ih)/2:black,
+       setsar=1
+     - Aspect-preserving "shrink to fit", then pad with black bars.
+     - No cropping — every pixel of the source frame is preserved.
+     - Bicubic interpolation.
+
+  2. Frame trim — exactly 49 frames @ 24 fps (≈ 2.042 s per clip)
+       -r 24 -frames:v 49 -t 2.0417
+     - Frame count constrained by LTX-2's VAE: frames % 8 == 1.
+     - 49 = (49 - 1) / 8 + 1 = 7 latent frames after temporal compression.
+
+  3. Encoding
+       -c:v libx264 -preset fast -crf 20 -pix_fmt yuv420p
+       -c:a aac -ar 44100 -ac 2 -b:a 96k
+     - Uniform encoder params so the gallery's `concat -c copy` works.
+
+What this means for training:
+
+  - The trainer's `process_dataset.py` reads files from THIS folder
+    (via _trainer_input.csv with video_path = "processed_videos/0NNN.mp4").
+  - These are the literal pixels the LTX-2 VAE encodes into the
+    `precomputed/vae_latents_video/processed_videos/0NNN.pt` file.
+  - The training_gallery.mp4 at the dataset root is built from these
+    same files, with index + caption overlay added — what you see in
+    that gallery is what the model sees.
+
+  - Some clips in raw_videos/ have fewer than 49 source frames; after
+    the trim above they end up as < 49-frame outputs and the trainer's
+    process_videos.py auto-skips them. Those indices have NO entry in
+    precomputed/vae_latents_video/ (text conditions are still encoded).
+    See metadata.json + the build log for the exact list.
+
+To regenerate from scratch:
+  python scripts/dataset_pipeline/render_gallery_for_dataset.py \
+      --dataset <local dataset dir>
+
+This file is informational only — nothing reads it programmatically.

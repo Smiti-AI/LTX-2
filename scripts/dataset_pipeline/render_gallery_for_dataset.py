@@ -40,7 +40,7 @@ def utc_now() -> str:
 def ensure_processed_videos(root: Path, clips: list[dict]) -> int:
     """Pre-process raw clips → processed_videos/{idx:04d}.mp4 (letterbox +
     49-frame trim). Idempotent: skip clips whose processed file exists."""
-    src_dir = root / "videos"
+    src_dir = root / "raw_videos"
     dst_dir = root / "processed_videos"
     dst_dir.mkdir(parents=True, exist_ok=True)
     new = 0
@@ -71,7 +71,7 @@ def render_gallery(root: Path, clips: list[dict], mode: str, out_path: Path,
     work_dir = root / f"_qa_render_cache" / mode
     per_clip_dir = work_dir / "per_clip"
     per_clip_dir.mkdir(parents=True, exist_ok=True)
-    src_dir = root / ("videos" if mode == "source" else "processed_videos")
+    src_dir = root / ("raw_videos" if mode == "source" else "processed_videos")
 
     rendered = skipped = failed = 0
     for c in clips:

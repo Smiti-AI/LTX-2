@@ -95,10 +95,12 @@ def cmd_delete(args: argparse.Namespace) -> int:
             continue
         moved_any = False
         for sub, name in [
-            ("videos", f"{idx:04d}.mp4"),
-            ("prompts", f"{idx:04d}.txt"),
-            ("latents", f"{idx:04d}.pt"),
-            ("gallery/per_clip", f"{idx:04d}.mp4"),
+            ("raw_videos", f"{idx:04d}.mp4"),
+            ("processed_videos", f"{idx:04d}.mp4"),
+            ("precomputed/vae_latents_video/processed_videos", f"{idx:04d}.pt"),
+            ("precomputed/text_prompt_conditions/processed_videos", f"{idx:04d}.pt"),
+            ("_qa_render_cache/source/per_clip", f"{idx:04d}.mp4"),
+            ("_qa_render_cache/training/per_clip", f"{idx:04d}.mp4"),
         ]:
             src = dataset / sub / name
             if src.exists():
@@ -150,12 +152,14 @@ def cmd_restore(args: argparse.Namespace) -> int:
     candidates = sorted(trash_root.iterdir(), reverse=True)
     restored = False
     for cand in candidates:
-        v = cand / "videos" / f"{args.index:04d}.mp4"
+        v = cand / "raw_videos" / f"{args.index:04d}.mp4"
         if v.exists():
-            for sub, name in [("videos", f"{args.index:04d}.mp4"),
-                              ("prompts", f"{args.index:04d}.txt"),
-                              ("latents", f"{args.index:04d}.pt"),
-                              ("gallery/per_clip", f"{args.index:04d}.mp4")]:
+            for sub, name in [("raw_videos", f"{args.index:04d}.mp4"),
+                              ("processed_videos", f"{args.index:04d}.mp4"),
+                              ("precomputed/vae_latents_video/processed_videos", f"{args.index:04d}.pt"),
+                              ("precomputed/text_prompt_conditions/processed_videos", f"{args.index:04d}.pt"),
+                              ("_qa_render_cache/source/per_clip", f"{args.index:04d}.mp4"),
+                              ("_qa_render_cache/training/per_clip", f"{args.index:04d}.mp4")]:
                 src = cand / sub / name
                 if src.exists():
                     dst_dir = dataset / sub
