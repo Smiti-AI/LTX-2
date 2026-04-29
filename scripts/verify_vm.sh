@@ -95,6 +95,10 @@ fi
 echo
 echo "[bucket round-trip: $PING_URI]"
 echo "ping_$(date +%s)" > "/tmp/$PING_OBJECT"
+# Pre-emptively drop any stale gcloud token cache so we don't end up using
+# a token from before the most recent scope or IAM change. Cheap; gcloud
+# will re-fetch from the metadata server on the next call.
+rm -f "$HOME/.config/gcloud/access_tokens.db" "$HOME/.config/gcloud/application_default_credentials.json" 2>/dev/null
 if gcloud storage cp "/tmp/$PING_OBJECT" "$PING_URI" --verbosity=warning 2>/tmp/_cp_err.log; then
   if gcloud storage cat "$PING_URI" >/dev/null 2>&1; then
     gcloud storage rm "$PING_URI" --verbosity=warning >/dev/null 2>&1

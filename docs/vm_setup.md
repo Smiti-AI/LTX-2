@@ -36,7 +36,7 @@ After §5 passes, the VM is ready for `bash scripts/dataset_pipeline/build_full.
 ### gcloud equivalent
 ```bash
 gcloud compute instances create NEW_VM_NAME \
-  --zone=us-central1-a \
+  --zone=us-central1-c   # ltx-2-development lives here; verify with: gcloud compute instances list \
   --machine-type=a2-highgpu-1g \
   --accelerator=type=nvidia-a100-80gb,count=1 \
   --boot-disk-size=1000GB \
@@ -48,7 +48,12 @@ gcloud compute instances create NEW_VM_NAME \
 
 ### Already-running VM with wrong scopes? Fix without rebuilding:
 ```bash
-gcloud compute instances stop VM_NAME --zone=ZONE
+# If the VM has a local SSD attached, gcloud requires --discard-local-ssd=true|false.
+# Local SSD is zonal scratch — its contents ARE lost on stop. Confirm nothing
+# important is mounted from it via:
+#   ssh USER@VM 'df -h ~ ~/LTX-2 ~/models; lsblk -o NAME,SIZE,TYPE,MOUNTPOINT'
+# `~/` typically lives on `/dev/sda1` (persistent boot disk) and survives stop.
+gcloud compute instances stop VM_NAME --zone=ZONE --discard-local-ssd=true
 gcloud compute instances set-service-account VM_NAME \
   --service-account=SA_EMAIL \
   --scopes=cloud-platform \
@@ -56,6 +61,12 @@ gcloud compute instances set-service-account VM_NAME \
 gcloud compute instances start VM_NAME --zone=ZONE
 ```
 ~2 min downtime. The boot disk persists across stop/start, so files under `~/` survive.
+
+**Verify the zone first** — `ltx-2-development` lives in `us-central1-c`, NOT
+`-a` despite the project default. Always:
+```bash
+gcloud compute instances list --filter="name=VM_NAME" --format="value(zone.basename())"
+```
 
 ### Verify scopes after boot
 ```bash
@@ -184,6 +195,7 @@ Exits 0 if all checks pass; non-zero with a clear summary otherwise.
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | `ERROR: ... 403 "Provided scope(s) are not authorized"` on a `gcloud storage cp` write | OAuth scope is `devstorage.read_only` (default) | Stop VM, set `--scopes=cloud-platform`, start (§1) |
+| Same 403 error AFTER the scope was already changed (curl with the metadata token works, but gcloud/gsutil keep saying 403) | gcloud cached an old token from before the scope change | `rm -f ~/.config/gcloud/access_tokens.db ~/.config/gcloud/application_default_credentials.json` then retry. gcloud will re-fetch from the metadata server. |
 | `403 "does not have storage.objects.list access"` | Missing IAM binding | `gcloud storage buckets add-iam-policy-binding ...` (§2) |
 | `gcloud auth print-access-token` fails on the developer's local machine | Refresh token expired | `gcloud auth login` (interactive once) |
 | `uv: command not found` under nohup | uv installed at `~/.local/bin/uv` not on nohup's PATH | Use full path `/home/USER/.local/bin/uv` or wrap in `bash -lc` |
