@@ -1,5 +1,5 @@
 # =============================================================================
-# Skye LoRA — DRY RUN (10 clips / 100 steps)
+# SKYE_PP LoRA — DRY RUN (10 clips / 100 steps)
 # =============================================================================
 # Purpose: Validate the full pipeline end-to-end before committing to full data.
 # Uses the 10-clip dry run dataset in /home/efrattaig/data/skye_dryrun_preprocessed.
@@ -51,7 +51,7 @@ data:
 
 validation:
   prompts:
-    - "SKYE, the Cockapoo pup from PAW Patrol, sits in her pink helicopter cockpit with her aviator helmet on. She says 'PAW Patrol, on a roll!' Her big purple eyes light up with excitement."
+    - "SKYE_PP, the Cockapoo pup from PAW Patrol, sits in her pink helicopter cockpit with her aviator helmet on. She says 'PAW Patrol, on a roll!' Her big purple eyes light up with excitement."
   negative_prompt: "worst quality, inconsistent motion, blurry, jittery, distorted"
   images:
     - "/home/efrattaig/data/start_frames/skye_helicopter_birthday_gili.png"

@@ -3,7 +3,7 @@
 # =============================================================================
 #
 # First PAW Patrol LoRA experiment trained on Season 1 Episode 3 Part A.
-# Same architecture as Chase EXP-1 / Skye EXP-3-highcap:
+# Same architecture as CHASE_PP EXP-1 / SKYE_PP EXP-3-highcap:
 #   - Rank 32, Attn + FFN layers
 #   - 50% I2V conditioning
 #   - 10k steps
@@ -71,9 +71,9 @@ data:
 
 validation:
   prompts:
-    - "SKYE and CHASE from PAW Patrol stand together at a crosswalk in Adventure Bay, the Lookout tower visible in the background. Skye turns to Chase and says 'Ready to cross?' Chase nods and replies 'Always look both ways first!' Both pups step confidently onto the crosswalk together. The audio captures their cheerful voices and paws on the pavement."
-    - "CHASE the German Shepherd pup stands at the crosswalk in Adventure Bay, looking left and right carefully. He says 'All clear — let's go, Skye!' His badge gleams as he steps forward. SKYE skips alongside him, her pink outfit bright in the sunshine. The audio has Chase's confident voice and the ambient sounds of the town."
-    - "SKYE and CHASE walk side by side across the sunny crosswalk in Adventure Bay, the colorful town buildings and Lookout tower behind them. Skye laughs and does a little spin, saying 'This is the best day!' Chase wags his tail and barks happily. The audio captures Skye's joyful laugh and Chase's bark echoing down the street."
+    - "SKYE_PP and CHASE_PP from PAW Patrol stand together at a crosswalk in Adventure Bay, the Lookout tower visible in the background. SKYE_PP turns to CHASE_PP and says 'Ready to cross?' CHASE_PP nods and replies 'Always look both ways first!' Both pups step confidently onto the crosswalk together. The audio captures their cheerful voices and paws on the pavement."
+    - "CHASE_PP the German Shepherd pup stands at the crosswalk in Adventure Bay, looking left and right carefully. He says 'All clear — let's go, SKYE_PP!' His badge gleams as he steps forward. SKYE_PP skips alongside him, her pink outfit bright in the sunshine. The audio has CHASE_PP's confident voice and the ambient sounds of the town."
+    - "SKYE_PP and CHASE_PP walk side by side across the sunny crosswalk in Adventure Bay, the colorful town buildings and Lookout tower behind them. SKYE_PP laughs and does a little spin, saying 'This is the best day!' CHASE_PP wags his tail and barks happily. The audio captures SKYE_PP's joyful laugh and CHASE_PP's bark echoing down the street."
   images:
     - "/home/efrattaig/LTX-2/inputs/BM_v1/benchmark_v1/skye_chase_crosswalk_safety/start_frame.png"
     - "/home/efrattaig/LTX-2/inputs/BM_v1/benchmark_v1/skye_chase_crosswalk_safety/start_frame.png"

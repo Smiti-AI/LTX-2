@@ -1,5 +1,5 @@
 # =============================================================================
-# Skye LoRA — EXP-2: Standard (rank 32 / 2500 steps)  ⭐ PRIMARY EXPERIMENT
+# SKYE_PP LoRA — EXP-2: Standard (rank 32 / 2500 steps)  ⭐ PRIMARY EXPERIMENT
 # =============================================================================
 #
 # Purpose: The core training run. Mirrors tutorial best-practice (rank 32).
@@ -7,7 +7,7 @@
 # Evaluate validation videos at step 1000 and 2000 before committing to full run.
 #
 # Tutorial found "pretty good" at 2000 steps, excellent at 5000.
-# Expected outcome: faithful Skye appearance, recognizable voice, correct motion.
+# Expected outcome: faithful SKYE_PP appearance, recognizable voice, correct motion.
 # =============================================================================
 
 model:
@@ -54,9 +54,9 @@ data:
 
 validation:
   prompts:
-    - "SKYE, the Cockapoo pup from PAW Patrol, sits in her pink helicopter cockpit with her aviator helmet on. She says 'PAW Patrol, on a roll!' Her big purple eyes light up with excitement as she pulls back on the controls. The audio captures her enthusiastic voice and the hum of the helicopter blades."
-    - "SKYE from PAW Patrol does an aerial barrel roll with her helicopter backpack, pink fur gleaming in the sunlight, ears streaming behind her as she spins. She calls out 'This pup's gotta fly!' The audio has her joyful laugh and the whirring of her rotors."
-    - "SKYE sits at the Lookout tower beside Chase, her tail wagging eagerly. She tilts her head and says 'Don't worry, I've got this!' Her purple eyes are wide and bright, full of confidence. The audio captures her clear, cheerful voice and ambient outdoor sounds."
+    - "SKYE_PP, the Cockapoo pup from PAW Patrol, sits in her pink helicopter cockpit with her aviator helmet on. She says 'PAW Patrol, on a roll!' Her big purple eyes light up with excitement as she pulls back on the controls. The audio captures her enthusiastic voice and the hum of the helicopter blades."
+    - "SKYE_PP from PAW Patrol does an aerial barrel roll with her helicopter backpack, pink fur gleaming in the sunlight, ears streaming behind her as she spins. She calls out 'This pup's gotta fly!' The audio has her joyful laugh and the whirring of her rotors."
+    - "SKYE_PP sits at the Lookout tower beside CHASE_PP, her tail wagging eagerly. She tilts her head and says 'Don't worry, I've got this!' Her purple eyes are wide and bright, full of confidence. The audio captures her clear, cheerful voice and ambient outdoor sounds."
   negative_prompt: "worst quality, inconsistent motion, blurry, jittery, distorted"
   images: null
   video_dims: [960, 544, 49]
