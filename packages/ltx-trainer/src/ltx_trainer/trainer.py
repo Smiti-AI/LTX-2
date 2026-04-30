@@ -249,6 +249,7 @@ class LtxvTrainer:
                             [step_loss] * len(self._last_step_sigmas),
                         )
                         metrics = {
+                            "train/global_step": self._global_step,
                             "train/loss": step_loss,
                             "train/learning_rate": current_lr,
                             "system/step_time": step_time,
