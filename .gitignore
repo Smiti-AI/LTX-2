@@ -56,3 +56,9 @@ docs/pre_flight.yaml
 docs/phase0/data_inventory.csv
 docs/phase0/duplicates.csv
 docs/phase0/quality_triage.csv
+
+# Local result/output artifacts (not source-controlled)
+output/
+lora_results
+lora_phase_v0/lora_results/skye_old/
+temp.txt
