@@ -22,8 +22,16 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 
+# deep_translator's GoogleTranslator uses legacy ISO 639-1 codes for a few
+# languages where the modern code differs (e.g. Hebrew: modern "he" vs.
+# legacy "iw", Indonesian: "id" vs. "in"). Translate the user-facing modern
+# code to what the library accepts.
+_LANG_ALIAS = {"he": "iw", "yi": "ji", "id": "in", "jv": "jw"}
+
+
 def translate_one(text: str, target: str, retries: int = 3) -> str:
     from deep_translator import GoogleTranslator
+    target = _LANG_ALIAS.get(target, target)
     last_err = None
     for i in range(retries):
         try:
