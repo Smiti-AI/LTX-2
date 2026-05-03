@@ -37,7 +37,7 @@ training_strategy:
 
 optimization:
   learning_rate: 3e-5
-  steps: 8000
+  steps: 2000
   batch_size: 1
   gradient_accumulation_steps: 1
   max_grad_norm: 1.0
@@ -71,9 +71,9 @@ validation:
   frame_rate: 24.0
   seed: 42
   inference_steps: 30
-  interval: 1000
+  interval: 250
   loss_holdout_count: 8
-  loss_interval: 200
+  loss_interval: 50
   loss_seed: 2025
   videos_per_prompt: 1
   guidance_scale: 4.0
@@ -84,7 +84,7 @@ validation:
   skip_initial_validation: true
 
 checkpoints:
-  interval: 1000
+  interval: 250
   keep_last_n: 2
   precision: "bfloat16"
 
