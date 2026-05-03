@@ -57,15 +57,15 @@ data:
 
 validation:
   prompts:
-    - "SKYE_PP the cockapoo flies her pink helicopter through the bright sky over Adventure Bay. She leans out of the cockpit, smiling, and says 'Happy birthday!' The audio captures the helicopter blades whirring and her cheerful, excited voice."
-    - "PLACEHOLDER — LoRA B validation prompt 2 (Skye, with audio)"
-    - "PLACEHOLDER — LoRA B validation prompt 3 (Skye, with audio)"
-    - "PLACEHOLDER — LoRA B validation prompt 4 (Skye, with audio)"
+    - "SKYE_PP the cockapoo pup stands in front of the Adventure Bay Lookout under a clear blue sky. She turns toward the camera with a bright smile and says cheerfully, 'Happy birthday!' Her eyes sparkle. The audio captures her cheerful, high-pitched voice, gentle ocean waves, and a soft breeze."
+    - "SKYE_PP the cockapoo pup stands in a snowy clearing surrounded by glowing Christmas trees and wrapped presents under a starry aurora sky. She tilts her head, the Santa hat on her ears shifting, and says warmly, 'Happy holidays!' The audio captures her cheerful voice, soft sleigh bells, and the gentle crunch of snow."
+    - "SKYE_PP the cockapoo pup sits on a wooden porch surrounded by glowing jack-o-lanterns under a crescent moon, wearing a small purple witch hat. She grins playfully and says, 'Happy Halloween!' Her ears perk up. The audio captures her cheerful voice, distant owl hoots, and the rustle of autumn leaves."
+    - "SKYE_PP the cockapoo pup stands in deep snow in front of the decorated Adventure Bay Lookout under a starry night sky. She lifts a paw and waves at the camera, smiling brightly, and says, 'Happy holidays!' The audio captures her cheerful voice, the soft hiss of falling snow, and a distant wind chime."
   images:
-    - "/home/efrat_t_smiti_ai/inference_seeds/goldenPLUS_mixed_cast_v1/skye_helicopter_birthday.png"
-    - "/home/efrat_t_smiti_ai/inference_seeds/skye_v1/PLACEHOLDER_seed_2.png"
-    - "/home/efrat_t_smiti_ai/inference_seeds/skye_v1/PLACEHOLDER_seed_3.png"
-    - "/home/efrat_t_smiti_ai/inference_seeds/skye_v1/PLACEHOLDER_seed_4.png"
+    - "/home/efrat_t_smiti_ai/inference_seeds/skye_v1/bey.png"
+    - "/home/efrat_t_smiti_ai/inference_seeds/skye_v1/crsms.png"
+    - "/home/efrat_t_smiti_ai/inference_seeds/skye_v1/holoween.png"
+    - "/home/efrat_t_smiti_ai/inference_seeds/skye_v1/snow.png"
   negative_prompt: "worst quality, inconsistent motion, blurry, jittery, distorted"
   video_dims: [960, 544, 49]
   frame_rate: 24.0

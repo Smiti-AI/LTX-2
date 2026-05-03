@@ -55,10 +55,10 @@ data:
 
 validation:
   prompts:
-    - "PLACEHOLDER — user-supplied LoRA A validation prompt 1"
-    - "PLACEHOLDER — user-supplied LoRA A validation prompt 2"
-    - "PLACEHOLDER — user-supplied LoRA A validation prompt 3"
-    - "PLACEHOLDER — user-supplied LoRA A validation prompt 4"
+    - "A medium portrait shot of SKYE_PP, the cockapoo pup, standing in front of the Adventure Bay Lookout under a bright blue sky. Her purple goggles rest atop her head, her pink uniform gleams in the daylight, and she gives a confident, warm smile while looking toward the camera, mouth slightly open as if mid-greeting."
+    - "A close-up portrait of SKYE_PP, the cockapoo pup, wearing a tiny red Santa hat. Her head is tilted slightly with a soft, joyful smile, and warm Christmas lights glow behind her, casting golden highlights on her fur. Her amber eyes sparkle with holiday excitement."
+    - "A portrait of SKYE_PP, the cockapoo pup, wearing a small purple witch hat with a tiny bat decoration. She sits among glowing jack-o-lanterns at twilight, her expression mischievous, her mouth slightly open in a cheerful, playful grin."
+    - "A portrait of SKYE_PP, the cockapoo pup, standing in deep snow at night. Behind her, the Adventure Bay Lookout glows with garlands and Christmas lights. She lifts one paw mid-step, her pink uniform vivid against the snow, her eyes wide with wonder and a bright smile on her muzzle."
   negative_prompt: "worst quality, blurry, distorted"
   images: null
   video_dims: [576, 864, 1]
