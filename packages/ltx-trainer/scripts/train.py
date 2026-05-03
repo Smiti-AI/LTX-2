@@ -14,16 +14,19 @@ For multi-GPU/FSDP training, configure and launch via Accelerate:
 
 import os
 
-# DDP device pinning: under `accelerate launch`, each process gets its own
-# LOCAL_RANK env var. The trainer's model loader uses `torch.device("cuda")`
-# which resolves to the current CUDA device, and the trainer only calls
-# torch.cuda.set_device(local_rank) AFTER text encoder / transformer loading.
-# Several downstream libs (bitsandbytes for 8-bit Gemma in particular)
-# additionally hardcode cuda:0. The cleanest fix is to hide all but this
-# rank's GPU at the very top of the entrypoint — every cuda:0 reference
-# downstream then lands on the rank's actual GPU.
+# DDP device pinning: under `accelerate launch --multi_gpu`, each process gets
+# its own LOCAL_RANK env var. The trainer's model loader uses
+# `torch.device("cuda")` which resolves to the *current* CUDA device, and the
+# trainer only calls torch.cuda.set_device(local_rank) AFTER text encoder /
+# transformer loading. Without an early set_device call, all ranks load to
+# cuda:0 and OOM. Set the current device here, before any model loading;
+# keep all GPUs visible so downstream code that references cuda:N (NCCL,
+# accelerate's own placement) still works.
 if "LOCAL_RANK" in os.environ:
-    os.environ["CUDA_VISIBLE_DEVICES"] = os.environ["LOCAL_RANK"]
+    import torch  # noqa: E402
+
+    if torch.cuda.is_available():
+        torch.cuda.set_device(int(os.environ["LOCAL_RANK"]))
 
 from pathlib import Path
 
