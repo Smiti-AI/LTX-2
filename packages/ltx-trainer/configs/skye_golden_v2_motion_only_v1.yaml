@@ -71,7 +71,11 @@ validation:
   frame_rate: 24.0
   seed: 42
   inference_steps: 30
-  interval: 250
+  # In-training validation samples disabled (caused OOM crash at step 1000 on
+  # the audio variant of this run — 49-frame I2V + audio inference spikes VRAM
+  # past 80 GB on H100). val/loss tracking via loss_interval is cheap and stays.
+  # Final inference runs manually after training via run_bm_v1_lora.py.
+  interval: 999999
   loss_holdout_count: 8
   loss_interval: 50
   loss_seed: 2025
