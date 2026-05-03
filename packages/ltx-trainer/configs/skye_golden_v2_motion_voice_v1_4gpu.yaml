@@ -1,0 +1,112 @@
+# =============================================================================
+# skye_golden_v2_motion_voice_v1_4gpu — LoRA B replica on 4× H100 (DDP)
+# =============================================================================
+# Identical to skye_golden_v2_motion_voice_v1.yaml except:
+#   - steps reduced 8000 → 2000 to compensate for 4× effective batch size
+#     (4 GPUs × bs 1 = 4 samples/step, so 2000 steps × 4 ≈ 8000 sample passes)
+#   - checkpoint interval scaled 1000 → 250
+#   - validation interval scaled 1000 → 250
+#   - loss interval scaled 200 → 50
+#   - output_dir + W&B run name suffix _4gpu (so it's distinguishable from
+#     the single-GPU run still in flight on 34.61.55.156).
+# Launch with:
+#   accelerate launch --config_file configs/accelerate/ddp.yaml \
+#                     scripts/train.py configs/skye_golden_v2_motion_voice_v1_4gpu.yaml
+# =============================================================================
+
+model:
+  model_path: "/home/efrat_t_smiti_ai/models/LTX-2.3/ltx-2.3-22b-dev.safetensors"
+  text_encoder_path: "/home/efrat_t_smiti_ai/models/gemma-3-12b-it-qat-q4_0-unquantized"
+  training_mode: "lora"
+  load_checkpoint: null
+
+lora:
+  rank: 32
+  alpha: 32
+  dropout: 0.0
+  target_modules:
+    - "to_k"
+    - "to_q"
+    - "to_v"
+    - "to_out.0"
+    - "ff.net.0.proj"
+    - "ff.net.2"
+    - "audio_ff.net.0.proj"
+    - "audio_ff.net.2"
+
+training_strategy:
+  name: "text_to_video"
+  first_frame_conditioning_p: 0.5
+  with_audio: true
+  audio_latents_dir: "audio_latents"
+
+optimization:
+  learning_rate: 3e-5
+  steps: 2000
+  batch_size: 1
+  gradient_accumulation_steps: 1
+  max_grad_norm: 1.0
+  optimizer_type: "adamw"
+  scheduler_type: "constant"
+  scheduler_params: {}
+  enable_gradient_checkpointing: true
+
+acceleration:
+  mixed_precision_mode: "bf16"
+  quantization: null
+  load_text_encoder_in_8bit: true
+
+data:
+  preprocessed_data_root: "/home/efrat_t_smiti_ai/training_data_full/skye_golden_v2/precomputed"
+  num_dataloader_workers: 2
+
+validation:
+  prompts:
+    - "SKYE_PP the cockapoo pup stands in front of the Adventure Bay Lookout under a clear blue sky. She turns toward the camera with a bright smile and says cheerfully, 'Happy birthday!' Her eyes sparkle. The audio captures her cheerful, high-pitched voice, gentle ocean waves, and a soft breeze."
+    - "SKYE_PP the cockapoo pup stands in a snowy clearing surrounded by glowing Christmas trees and wrapped presents under a starry aurora sky. She tilts her head, the Santa hat on her ears shifting, and says warmly, 'Happy holidays!' The audio captures her cheerful voice, soft sleigh bells, and the gentle crunch of snow."
+    - "SKYE_PP the cockapoo pup sits on a wooden porch surrounded by glowing jack-o-lanterns under a crescent moon, wearing a small purple witch hat. She grins playfully and says, 'Happy Halloween!' Her ears perk up. The audio captures her cheerful voice, distant owl hoots, and the rustle of autumn leaves."
+    - "SKYE_PP the cockapoo pup stands in deep snow in front of the decorated Adventure Bay Lookout under a starry night sky. She lifts a paw and waves at the camera, smiling brightly, and says, 'Happy holidays!' The audio captures her cheerful voice, the soft hiss of falling snow, and a distant wind chime."
+  images:
+    - "/home/efrat_t_smiti_ai/inference_seeds/skye_v1/bey.png"
+    - "/home/efrat_t_smiti_ai/inference_seeds/skye_v1/crsms.png"
+    - "/home/efrat_t_smiti_ai/inference_seeds/skye_v1/holoween.png"
+    - "/home/efrat_t_smiti_ai/inference_seeds/skye_v1/snow.png"
+  negative_prompt: "worst quality, inconsistent motion, blurry, jittery, distorted"
+  video_dims: [960, 544, 49]
+  frame_rate: 24.0
+  seed: 42
+  inference_steps: 30
+  interval: 250
+  loss_holdout_count: 8
+  loss_interval: 50
+  loss_seed: 2025
+  videos_per_prompt: 1
+  guidance_scale: 4.0
+  stg_scale: 1.0
+  stg_blocks: [29]
+  stg_mode: "stg_av"
+  generate_audio: true
+  skip_initial_validation: true
+
+checkpoints:
+  interval: 250
+  keep_last_n: 2
+  precision: "bfloat16"
+
+flow_matching:
+  timestep_sampling_mode: "shifted_logit_normal"
+  timestep_sampling_params: {}
+
+hub:
+  push_to_hub: false
+  hub_model_id: null
+
+wandb:
+  enabled: true
+  project: "LTX2_lora"
+  entity: null
+  tags: ["skye", "motion_voice", "videos", "audio", "rank32", "4gpu", "ddp", "skye_golden_v2_motion_voice_v1"]
+  log_validation_videos: true
+
+seed: 42
+output_dir: "outputs/skye_golden_v2_motion_voice_v1_4gpu"
