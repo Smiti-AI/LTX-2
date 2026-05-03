@@ -1,0 +1,23 @@
+{
+  "description": "Personalized holiday greeting from Skye to Maya, with grandma Ruth message. Snowy Adventure Bay lookout decorated for Christmas/Chanukah.",
+  "global_prompt": "High-quality 3D animation in the official PAW Patrol style, vibrant colors, cinematic lighting, smooth character animation, 4k render, detailed textures, expressive facial expressions, perfect lip-sync.",
+  "duration": 10,
+  "specific_prompts": [
+    "[VISUAL DESCRIPTION & MOVEMENT]:\nSKYE_PP, the cockapoo pup, sits in deep snow in front of the snow-covered Adventure Bay Lookout tower. The tower is decorated with garlands, multicolored Christmas lights, and a glowing star at the top; a banner reads 'Chag Chanukah Sameach / Merry Christmas'. Snow-laden pine trees and a wrapped present-shaped vehicle are visible behind her. Soft snowflakes drift down throughout the shot and the Christmas lights twinkle on a slow loop.\n\nObject Movement: Skye sits and looks directly at the camera with a cheerful, warm expression. As she speaks, her muzzle moves in tight lip-sync with her words. Her tail wags excitedly back and forth. Mid-sentence, she gives a small playful hop in place, lands softly, and resumes her sitting pose with a wider grin. Her ears perk up and tilt slightly with each phrase.\nCamera Movement: Locked-off medium shot framing Skye centered with the lookout tower visible behind her.\nExpression: Friendly, warm, sincere — eyes wide and bright, mouth in a soft genuine smile between words.\n\n[DIALOGUE — WHAT SHE SAYS]:\nSkye (in a sweet, friendly, slightly high-pitched cockapoo-pup voice): \"Happy Holidays, Maya! Your grandma Ruth wishes you a very happy holiday — and sends you lots of love!\"\n\n[AUDIO]:\nSkye's clear cheerful voice in tight lip-sync. Soft falling-snow ambience and a gentle distant wind chime. A subtle musical sparkle on the word 'love'."
+  ],
+  "seed": 42,
+  "dimensions": {
+    "width": 960,
+    "height": 544
+  },
+  "negative_prompt": "low quality, bad anatomy, deformed bodies, distorted faces, scary expressions, extra limbs, impossible positions, glitch, artifacts, darkness, grim atmosphere, out-of-focus face, characters merged, melting, bad composition, overly stylized, outdated cartoon style, mismatched lip sync, garbled speech, robotic voice, mute video",
+  "fps": 24,
+  "motion_bucket": 7,
+  "images": [
+    {
+      "path": "start_frame.png",
+      "frame_idx": 0,
+      "strength": 0.9
+    }
+  ]
+}

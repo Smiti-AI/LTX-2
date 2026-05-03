@@ -1,0 +1,23 @@
+{
+  "description": "Fourth-wall-breaking camera lick: Skye runs from the lookout to the camera, licks the lens, says 'I love you Efrat', winks, and runs back. High-angle wide opening on the Lookout and grass.",
+  "global_prompt": "High-quality 3D animation in the official PAW Patrol style, vibrant colors, cinematic lighting, smooth character animation, 4k render, detailed textures, expressive facial expressions, perfect lip-sync.",
+  "duration": 10,
+  "specific_prompts": [
+    "[VISUAL DESCRIPTION & MOVEMENT]:\nOpening on a high-angle wide shot looking down at the Adventure Bay Lookout tower from above. SKYE_PP, the cockapoo pup, stands small in the bright green grass directly below the tower. The ocean is visible to the left and Adventure Bay town to the upper right.\n\nObject Movement (over the 10 seconds):\n  1. ~0–2 s: Skye notices the camera, smiles, and begins running directly toward the camera across the grass with bouncy puppy strides.\n  2. ~2–4 s: She gets progressively closer; the camera lowers to her eye level as she approaches, until her face fills the frame.\n  3. ~4–5.5 s: Extreme close-up on her wet nose and tongue. She playfully licks the camera lens — the lens picks up a realistic 'wet screen' smudge effect with a few water droplets and a brief soft-focus blur on the licked area.\n  4. ~5.5–7.5 s: After the lick, she pulls back slightly into a tight close-up, gives a joyful puppy laugh, then a clear playful wink (one eye fully closes, the other stays bright). She says her line into the camera with tight lip-sync.\n  5. ~7.5–10 s: She turns and playfully bounds back toward the tower in the background, tail wagging, getting smaller until she is back at the tower's base. Camera tilts slightly to keep the tower in frame.\n\nCamera Movement: Begins as a high-angle wide shot, lowers smoothly to ground level as Skye approaches, holds at extreme close-up during the lick + line, then tilts back up slightly as she runs away. No hard cuts.\nExpression: Playful, joyful, immersive — bright eyes, big puppy smile, single clear wink during the line.\n\n[DIALOGUE — WHAT SHE SAYS]:\nSkye (in a sweet, joyful, slightly high-pitched cockapoo-pup voice, right after the camera lick): \"I love you, Efrat!\"\n\n[AUDIO]:\nSkye's clear cheerful voice in tight lip-sync. A soft, wet 'lick' SFX on the lens contact, followed by a short genuine puppy laugh. Light grass-rustle and footsteps as she runs to and from the camera, plus subtle ocean ambience and a gentle breeze."
+  ],
+  "seed": 42,
+  "dimensions": {
+    "width": 960,
+    "height": 544
+  },
+  "negative_prompt": "low quality, bad anatomy, deformed bodies, distorted faces, scary expressions, extra limbs, impossible positions, glitch, artifacts, darkness, grim atmosphere, out-of-focus face during line, characters merged, melting, bad composition, overly stylized, outdated cartoon style, mismatched lip sync, garbled speech, robotic voice, mute video, hard cut, two skyes, doubled character",
+  "fps": 24,
+  "motion_bucket": 7,
+  "images": [
+    {
+      "path": "start_frame.png",
+      "frame_idx": 0,
+      "strength": 0.9
+    }
+  ]
+}

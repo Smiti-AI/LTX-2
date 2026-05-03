@@ -1,0 +1,23 @@
+{
+  "description": "Educational explainer: Skye narrates the four seasons while the Adventure Bay lookout environment transitions through summer, autumn, winter, and spring.",
+  "global_prompt": "High-quality 3D animation in the official PAW Patrol style, vibrant colors, cinematic lighting, smooth character animation, 4k render, detailed textures, expressive facial expressions, perfect lip-sync, smooth weather transitions.",
+  "duration": 10,
+  "specific_prompts": [
+    "[VISUAL DESCRIPTION & MOVEMENT]:\nSKYE_PP, the cockapoo pup, sits centered on bright green grass in front of the Adventure Bay Lookout tower under a clear summer sky. As she speaks, the environment behind her transitions smoothly through four seasons in sync with her dialogue.\n\nSeason transitions, in order:\n  1. Summer (~0–2.5 s): bright sun, deep green grass, light breeze rustling Skye's ears.\n  2. Autumn (~2.5–5 s): the sky turns warm golden, and orange and red maple leaves swirl around the tower; a few leaves drift past Skye's face.\n  3. Winter (~5–7.5 s): thick snow rapidly accumulates on the tower and ground; tiny visible breath puffs from Skye's muzzle as she speaks.\n  4. Spring (~7.5–10 s): the snow melts; bright pink and yellow flowers bloom in waves around Skye; sunlight returns.\n\nObject Movement: Skye sits and looks directly at the camera with a friendly smile, her head tilting slightly with each season change. Her tail wags gently. Her muzzle moves in tight lip-sync with her words. During each transition, her ears flick to acknowledge the new weather.\nCamera Movement: Locked-off medium shot framing Skye centered with the lookout tower behind her.\nExpression: Warm, educational, encouraging — eyes wide and bright; small genuine smile.\n\n[DIALOGUE — WHAT SHE SAYS]:\nSkye (in a sweet, friendly, slightly high-pitched cockapoo-pup voice): \"We have four beautiful seasons! Summer is sunny, Autumn has falling leaves, Winter is snowy and cold, and Spring brings colorful flowers!\"\n\n[AUDIO]:\nSkye's clear cheerful voice in tight lip-sync. Subtle ambient layer that morphs with the seasons: warm cicadas in summer, rustling leaves and a soft gust in autumn, muffled wind and a soft sleigh-bell tone in winter, birdsong and a light breeze in spring."
+  ],
+  "seed": 42,
+  "dimensions": {
+    "width": 960,
+    "height": 544
+  },
+  "negative_prompt": "low quality, bad anatomy, deformed bodies, distorted faces, scary expressions, extra limbs, impossible positions, glitch, artifacts, darkness, grim atmosphere, out-of-focus face, characters merged, melting, bad composition, overly stylized, outdated cartoon style, mismatched lip sync, garbled speech, robotic voice, mute video, abrupt scene cuts, jumbled season order",
+  "fps": 24,
+  "motion_bucket": 7,
+  "images": [
+    {
+      "path": "start_frame.png",
+      "frame_idx": 0,
+      "strength": 0.9
+    }
+  ]
+}
