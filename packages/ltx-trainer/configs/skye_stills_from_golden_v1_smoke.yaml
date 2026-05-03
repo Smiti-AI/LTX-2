@@ -1,0 +1,101 @@
+# =============================================================================
+# skye_stills_from_golden_v1_smoke — 100-step plumbing smoke for LoRA A
+# =============================================================================
+# Identical to skye_stills_from_golden_v1.yaml except:
+#   - 100 total steps
+#   - ckpt every 50 steps (to verify GCS sync catches files)
+#   - validation interval 50 (verifies inference path on a partial LoRA)
+#   - loss_interval 25
+# =============================================================================
+
+model:
+  model_path: "/home/efrat_t_smiti_ai/models/LTX-2.3/ltx-2.3-22b-dev.safetensors"
+  text_encoder_path: "/home/efrat_t_smiti_ai/models/gemma-3-12b-it-qat-q4_0-unquantized"
+  training_mode: "lora"
+  load_checkpoint: null
+
+lora:
+  rank: 32
+  alpha: 32
+  dropout: 0.0
+  target_modules:
+    - "to_k"
+    - "to_q"
+    - "to_v"
+    - "to_out.0"
+    - "ff.net.0.proj"
+    - "ff.net.2"
+    - "audio_ff.net.0.proj"
+    - "audio_ff.net.2"
+
+training_strategy:
+  name: "text_to_video"
+  first_frame_conditioning_p: 0.0
+  with_audio: false
+
+optimization:
+  learning_rate: 3e-5
+  steps: 100
+  batch_size: 1
+  gradient_accumulation_steps: 1
+  max_grad_norm: 1.0
+  optimizer_type: "adamw"
+  scheduler_type: "constant"
+  scheduler_params: {}
+  enable_gradient_checkpointing: true
+
+acceleration:
+  mixed_precision_mode: "bf16"
+  quantization: null
+  load_text_encoder_in_8bit: true
+
+data:
+  preprocessed_data_root: "/home/efrat_t_smiti_ai/training_data_full/skye_stills_from_golden/precomputed"
+  num_dataloader_workers: 2
+
+validation:
+  prompts:
+    - "PLACEHOLDER — user-supplied LoRA A validation prompt 1"
+    - "PLACEHOLDER — user-supplied LoRA A validation prompt 2"
+    - "PLACEHOLDER — user-supplied LoRA A validation prompt 3"
+    - "PLACEHOLDER — user-supplied LoRA A validation prompt 4"
+  negative_prompt: "worst quality, blurry, distorted"
+  images: null
+  video_dims: [576, 864, 1]
+  frame_rate: 24.0
+  seed: 42
+  inference_steps: 30
+  interval: 50
+  loss_holdout_count: 4
+  loss_interval: 25
+  loss_seed: 2025
+  videos_per_prompt: 1
+  guidance_scale: 4.0
+  stg_scale: 1.0
+  stg_blocks: [29]
+  stg_mode: "stg_av"
+  generate_audio: false
+  skip_initial_validation: true
+
+checkpoints:
+  interval: 50
+  keep_last_n: 2
+  precision: "bfloat16"
+
+flow_matching:
+  timestep_sampling_mode: "shifted_logit_normal"
+  timestep_sampling_params: {}
+
+hub:
+  push_to_hub: false
+  hub_model_id: null
+
+wandb:
+  enabled: true
+  project: "LTX2_lora"
+  entity: null
+  tags: ["skye", "visual_anchor", "stills", "rank32", "smoke", "skye_stills_from_golden_v1"]
+  log_validation_videos: true
+
+seed: 42
+output_dir: "outputs/skye_stills_from_golden_v1_smoke"

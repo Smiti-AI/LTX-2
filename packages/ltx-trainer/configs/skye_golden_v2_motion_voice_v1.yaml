@@ -1,0 +1,107 @@
+# =============================================================================
+# skye_golden_v2_motion_voice_v1 — LoRA B (Motion + Voice, videos+audio)
+# =============================================================================
+# Trains motion physics, voice timbre, and lip-sync on 103 train clips
+# (8 held out for val/loss) at 49 frames @ 24 fps, 960x544 letterbox, with
+# audio latents already pre-computed in skye_golden_v2.
+#
+# Stacks at inference with skye_stills_from_golden_v1 via peft.add_weighted_adapter.
+# Same rank/alpha/target_modules as LoRA A — required for merge.
+# =============================================================================
+
+model:
+  model_path: "/home/efrat_t_smiti_ai/models/LTX-2.3/ltx-2.3-22b-dev.safetensors"
+  text_encoder_path: "/home/efrat_t_smiti_ai/models/gemma-3-12b-it-qat-q4_0-unquantized"
+  training_mode: "lora"
+  load_checkpoint: null
+
+lora:
+  rank: 32
+  alpha: 32
+  dropout: 0.0
+  target_modules:
+    - "to_k"
+    - "to_q"
+    - "to_v"
+    - "to_out.0"
+    - "ff.net.0.proj"
+    - "ff.net.2"
+    - "audio_ff.net.0.proj"
+    - "audio_ff.net.2"
+
+training_strategy:
+  name: "text_to_video"
+  first_frame_conditioning_p: 0.5
+  with_audio: true
+  audio_latents_dir: "audio_latents"
+
+optimization:
+  learning_rate: 3e-5
+  steps: 8000
+  batch_size: 1
+  gradient_accumulation_steps: 1
+  max_grad_norm: 1.0
+  optimizer_type: "adamw"
+  scheduler_type: "constant"
+  scheduler_params: {}
+  enable_gradient_checkpointing: true
+
+acceleration:
+  mixed_precision_mode: "bf16"
+  quantization: null
+  load_text_encoder_in_8bit: true
+
+data:
+  preprocessed_data_root: "/home/efrat_t_smiti_ai/training_data_full/skye_golden_v2"
+  num_dataloader_workers: 2
+
+validation:
+  prompts:
+    - "SKYE_PP the cockapoo flies her pink helicopter through the bright sky over Adventure Bay. She leans out of the cockpit, smiling, and says 'Happy birthday!' The audio captures the helicopter blades whirring and her cheerful, excited voice."
+    - "PLACEHOLDER — LoRA B validation prompt 2 (Skye, with audio)"
+    - "PLACEHOLDER — LoRA B validation prompt 3 (Skye, with audio)"
+    - "PLACEHOLDER — LoRA B validation prompt 4 (Skye, with audio)"
+  images:
+    - "/home/efrat_t_smiti_ai/inference_seeds/goldenPLUS_mixed_cast_v1/skye_helicopter_birthday.png"
+    - "/home/efrat_t_smiti_ai/inference_seeds/skye_v1/PLACEHOLDER_seed_2.png"
+    - "/home/efrat_t_smiti_ai/inference_seeds/skye_v1/PLACEHOLDER_seed_3.png"
+    - "/home/efrat_t_smiti_ai/inference_seeds/skye_v1/PLACEHOLDER_seed_4.png"
+  negative_prompt: "worst quality, inconsistent motion, blurry, jittery, distorted"
+  video_dims: [960, 544, 49]
+  frame_rate: 24.0
+  seed: 42
+  inference_steps: 30
+  interval: 1000
+  loss_holdout_count: 8
+  loss_interval: 200
+  loss_seed: 2025
+  videos_per_prompt: 1
+  guidance_scale: 4.0
+  stg_scale: 1.0
+  stg_blocks: [29]
+  stg_mode: "stg_av"
+  generate_audio: true
+  skip_initial_validation: true
+
+checkpoints:
+  interval: 1000
+  keep_last_n: 2
+  precision: "bfloat16"
+
+flow_matching:
+  timestep_sampling_mode: "shifted_logit_normal"
+  timestep_sampling_params: {}
+
+hub:
+  push_to_hub: false
+  hub_model_id: null
+
+wandb:
+  enabled: true
+  project: "LTX2_lora"
+  entity: null
+  tags: ["skye", "motion_voice", "videos", "audio", "rank32", "skye_golden_v2_motion_voice_v1"]
+  log_validation_videos: true
+
+seed: 42
+output_dir: "outputs/skye_golden_v2_motion_voice_v1"
