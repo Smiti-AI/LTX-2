@@ -1,0 +1,100 @@
+# =============================================================================
+# skye_stills_from_golden_v1_continue — resume LoRA A from step 3000
+# =============================================================================
+# Base run hit step 3000 (87 train × ~33 epochs). Validation samples were
+# improving but visual identity not yet locked in. Continue +3000 more steps
+# (target step = 6000) at the same constant LR 3e-5 — pattern matches
+# goldenPLUS_mixed_cast_v1_continue.yaml.
+# =============================================================================
+
+model:
+  model_path: "/home/efrat_t_smiti_ai/models/LTX-2.3/ltx-2.3-22b-dev.safetensors"
+  text_encoder_path: "/home/efrat_t_smiti_ai/models/gemma-3-12b-it-qat-q4_0-unquantized"
+  training_mode: "lora"
+  load_checkpoint: "/home/efrat_t_smiti_ai/LTX-2/packages/ltx-trainer/outputs/skye_stills_from_golden_v1/checkpoints/lora_weights_step_03000.safetensors"
+
+lora:
+  rank: 32
+  alpha: 32
+  dropout: 0.0
+  target_modules:
+    - "to_k"
+    - "to_q"
+    - "to_v"
+    - "to_out.0"
+    - "ff.net.0.proj"
+    - "ff.net.2"
+    - "audio_ff.net.0.proj"
+    - "audio_ff.net.2"
+
+training_strategy:
+  name: "text_to_video"
+  first_frame_conditioning_p: 0.0
+  with_audio: false
+
+optimization:
+  learning_rate: 3e-5
+  steps: 6000
+  batch_size: 1
+  gradient_accumulation_steps: 1
+  max_grad_norm: 1.0
+  optimizer_type: "adamw"
+  scheduler_type: "constant"
+  scheduler_params: {}
+  enable_gradient_checkpointing: true
+
+acceleration:
+  mixed_precision_mode: "bf16"
+  quantization: null
+  load_text_encoder_in_8bit: true
+
+data:
+  preprocessed_data_root: "/home/efrat_t_smiti_ai/training_data_full/skye_stills_from_golden/precomputed"
+  num_dataloader_workers: 2
+
+validation:
+  prompts:
+    - "A medium portrait shot of SKYE_PP, the cockapoo pup, standing in front of the Adventure Bay Lookout under a bright blue sky. Her purple goggles rest atop her head, her pink uniform gleams in the daylight, and she gives a confident, warm smile while looking toward the camera, mouth slightly open as if mid-greeting."
+    - "A close-up portrait of SKYE_PP, the cockapoo pup, wearing a tiny red Santa hat. Her head is tilted slightly with a soft, joyful smile, and warm Christmas lights glow behind her, casting golden highlights on her fur. Her amber eyes sparkle with holiday excitement."
+    - "A portrait of SKYE_PP, the cockapoo pup, wearing a small purple witch hat with a tiny bat decoration. She sits among glowing jack-o-lanterns at twilight, her expression mischievous, her mouth slightly open in a cheerful, playful grin."
+    - "A portrait of SKYE_PP, the cockapoo pup, standing in deep snow at night. Behind her, the Adventure Bay Lookout glows with garlands and Christmas lights. She lifts one paw mid-step, her pink uniform vivid against the snow, her eyes wide with wonder and a bright smile on her muzzle."
+  negative_prompt: "worst quality, blurry, distorted"
+  images: null
+  video_dims: [576, 864, 1]
+  frame_rate: 24.0
+  seed: 42
+  inference_steps: 30
+  interval: 500
+  loss_holdout_count: 4
+  loss_interval: 100
+  loss_seed: 2025
+  videos_per_prompt: 1
+  guidance_scale: 4.0
+  stg_scale: 1.0
+  stg_blocks: [29]
+  stg_mode: "stg_av"
+  generate_audio: false
+  skip_initial_validation: true
+
+checkpoints:
+  interval: 500
+  keep_last_n: 2
+  precision: "bfloat16"
+
+flow_matching:
+  timestep_sampling_mode: "shifted_logit_normal"
+  timestep_sampling_params: {}
+
+hub:
+  push_to_hub: false
+  hub_model_id: null
+
+wandb:
+  enabled: true
+  project: "LTX2_lora"
+  entity: null
+  tags: ["skye", "visual_anchor", "stills", "rank32", "skye_stills_from_golden_v1", "continue"]
+  log_validation_videos: true
+
+seed: 42
+output_dir: "outputs/skye_stills_from_golden_v1_continue"
